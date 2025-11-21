@@ -47,3 +47,7 @@ CLAUDE.md
 .claude
 
 benchmark_results/
+desktop.ini
+.gitignore
+resources/example_data/PhoHale
+PROJECT
