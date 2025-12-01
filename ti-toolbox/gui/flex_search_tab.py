@@ -174,8 +174,10 @@ class FlexSearchTab(QtWidgets.QWidget):
         self.goal_label = QtWidgets.QLabel("Optimization Goal:")
         self.postproc_label = QtWidgets.QLabel("Post-processing Method:")
         self.roi_method_label = QtWidgets.QLabel("ROI Definition Method:")
-        self.radius_label = QtWidgets.QLabel("Electrode Radius (mm):")
         self.current_label = QtWidgets.QLabel("Electrode Current (mA):")
+        self.electrode_shape_label = QtWidgets.QLabel("Electrode Shape:")
+        self.dimensions_label = QtWidgets.QLabel("Dimensions (mm, x,y):")
+        self.thickness_label = QtWidgets.QLabel("Thickness (mm):")
         self.eeg_net_label = QtWidgets.QLabel("EEG Net Template:")
         self.roi_hemi_label = QtWidgets.QLabel("Hemisphere:")
         self.nonroi_hemi_label = QtWidgets.QLabel("Hemisphere:")
@@ -198,18 +200,21 @@ class FlexSearchTab(QtWidgets.QWidget):
         self.run_mapped_simulation_checkbox = QtWidgets.QCheckBox("Run simulation with mapped electrodes")
         self.run_mapped_simulation_checkbox.setChecked(False)
         
-        self.run_final_electrode_simulation_checkbox = QtWidgets.QCheckBox("✓ Run final electrode simulation")
-        self.run_final_electrode_simulation_checkbox.setChecked(True)
+        self.run_final_electrode_simulation_checkbox = QtWidgets.QCheckBox("Run final electrode simulation")
+        self.run_final_electrode_simulation_checkbox.setChecked(False)
         
         # Initialize radio buttons
         self.roi_method_spherical = QtWidgets.QRadioButton("Spherical (coordinates and radius)")
         self.roi_method_cortical = QtWidgets.QRadioButton("Cortical")
         self.roi_method_subcortical = QtWidgets.QRadioButton("Subcortical")
         self.roi_method_spherical.setChecked(True)
+
+        # Initialize coordinate space radio buttons
+        self.roi_space_subject = QtWidgets.QRadioButton("Subject Space")
+        self.roi_space_mni = QtWidgets.QRadioButton("MNI Space")
+        self.roi_space_subject.setChecked(True)  # Default to subject space
         
         # Initialize spinboxes and line edits
-        self.radius_input = QtWidgets.QDoubleSpinBox()
-        self.radius_input.setRange(1, 30); self.radius_input.setValue(4); self.radius_input.setDecimals(1)
         
         self.current_input = QtWidgets.QDoubleSpinBox()
         self.current_input.setRange(0.1, 100); self.current_input.setValue(1.0); self.current_input.setDecimals(1)
@@ -224,11 +229,11 @@ class FlexSearchTab(QtWidgets.QWidget):
         self.n_multistart_input.setRange(1, 20); self.n_multistart_input.setValue(1)
         self.n_multistart_input.setToolTip("Number of optimization runs to perform. Higher values increase chances of finding global optimum but take longer.")
         self.n_multistart_label = QtWidgets.QLabel("Number of Optimization Runs:")
-        
+
         self.max_iterations_input = QtWidgets.QSpinBox()
         self.max_iterations_input.setRange(50, 2000); self.max_iterations_input.setValue(500)
         self.max_iterations_input.setToolTip("Maximum number of optimization iterations.")
-        
+
         self.population_size_input = QtWidgets.QSpinBox()
         self.population_size_input.setRange(4, 100); self.population_size_input.setValue(13)
         self.population_size_input.setToolTip("Number of individuals in the population for optimization.")
@@ -237,11 +242,65 @@ class FlexSearchTab(QtWidgets.QWidget):
         self.cpus_input.setRange(1, os.cpu_count() or 16)
         self.cpus_input.setValue(1)
         self.cpus_input.setToolTip("Number of CPU cores to use for parallel processing during optimization.")
+
+        # Differential evolution optimizer parameters
+        self.tolerance_input = QtWidgets.QDoubleSpinBox()
+        self.tolerance_input.setRange(0.0001, 1.0); self.tolerance_input.setValue(0.1)
+        self.tolerance_input.setDecimals(4); self.tolerance_input.setSingleStep(0.01)
+        self.tolerance_input.setToolTip("Convergence tolerance for differential evolution optimizer (default: 0.1)")
+        self.tolerance_label = QtWidgets.QLabel("Tolerance:")
+
+        self.mutation_min_input = QtWidgets.QDoubleSpinBox()
+        self.mutation_min_input.setRange(0.0, 2.0); self.mutation_min_input.setValue(0.01)
+        self.mutation_min_input.setDecimals(3); self.mutation_min_input.setSingleStep(0.01)
+        self.mutation_min_input.setToolTip("Minimum mutation factor (default: 0.01)")
+
+        self.mutation_max_input = QtWidgets.QDoubleSpinBox()
+        self.mutation_max_input.setRange(0.0, 2.0); self.mutation_max_input.setValue(0.5)
+        self.mutation_max_input.setDecimals(3); self.mutation_max_input.setSingleStep(0.01)
+        self.mutation_max_input.setToolTip("Maximum mutation factor (default: 0.5)")
+        self.mutation_label = QtWidgets.QLabel("Mutation (min, max):")
+
+        self.recombination_input = QtWidgets.QDoubleSpinBox()
+        self.recombination_input.setRange(0.0, 1.0); self.recombination_input.setValue(0.7)
+        self.recombination_input.setDecimals(2); self.recombination_input.setSingleStep(0.05)
+        self.recombination_input.setToolTip("Recombination probability for differential evolution (default: 0.7)")
+        self.recombination_label = QtWidgets.QLabel("Recombination:")
+
+        # Detailed results checkbox
+        self.detailed_results_checkbox = QtWidgets.QCheckBox("Enable detailed results output")
+        self.detailed_results_checkbox.setChecked(False)
+        self.detailed_results_checkbox.setToolTip("Enable detailed results output (creates additional visualization and debug files)")
+
+        # Visualize valid skin region checkbox
+        self.visualize_skin_checkbox = QtWidgets.QCheckBox("Visualize valid skin region")
+        self.visualize_skin_checkbox.setChecked(False)
+        self.visualize_skin_checkbox.setToolTip("Create 2D visualizations of valid skin region for electrode placement (requires detailed results)")
+        self.visualize_skin_checkbox.setEnabled(False)  # Initially disabled until detailed results is checked
+
+        # EEG net selection for skin visualization
+        self.skin_net_combo = QtWidgets.QComboBox()
+        self.skin_net_combo.setEnabled(False)  # Initially disabled until skin visualization is checked
+        self.skin_net_combo.setToolTip("Select EEG net to visualize electrode positions on skin surface")
+        self.skin_net_label = QtWidgets.QLabel("Visualization EEG Net:")
         
         self.roi_x_input = QtWidgets.QDoubleSpinBox(); self.roi_x_input.setRange(-150, 150); self.roi_x_input.setValue(0); self.roi_x_input.setDecimals(2)
         self.roi_y_input = QtWidgets.QDoubleSpinBox(); self.roi_y_input.setRange(-150, 150); self.roi_y_input.setValue(0); self.roi_y_input.setDecimals(2)
         self.roi_z_input = QtWidgets.QDoubleSpinBox(); self.roi_z_input.setRange(-150, 150); self.roi_z_input.setValue(0); self.roi_z_input.setDecimals(2)
         self.roi_radius_input = QtWidgets.QDoubleSpinBox(); self.roi_radius_input.setRange(1, 50); self.roi_radius_input.setValue(10); self.roi_radius_input.setDecimals(2)
+
+        # Electrode shape, dimensions, and thickness
+        self.electrode_shape_rect = QtWidgets.QRadioButton("Rectangle")
+        self.electrode_shape_rect.setProperty("value", "rect")
+        self.electrode_shape_ellipse = QtWidgets.QRadioButton("Ellipse")
+        self.electrode_shape_ellipse.setProperty("value", "ellipse")
+        self.electrode_shape_ellipse.setChecked(True)  # Set default to Ellipse
+        self.dimensions_input = QtWidgets.QLineEdit()
+        self.dimensions_input.setPlaceholderText("8,8")
+        self.dimensions_input.setText("8,8")  # Set default to 8,8
+        self.thickness_input = QtWidgets.QLineEdit()
+        self.thickness_input.setPlaceholderText("4")
+        self.thickness_input.setText("4")  # Set default to 4mm
         
         self.label_value_input = QtWidgets.QSpinBox(); self.label_value_input.setRange(1, 10000); self.label_value_input.setValue(1)
         
@@ -334,6 +393,8 @@ class FlexSearchTab(QtWidgets.QWidget):
         self.adaptive_focality_checkbox.toggled.connect(self._update_adaptive_focality_controls)
         self.run_mapped_simulation_checkbox.toggled.connect(self._update_mapping_options)
         self.subject_list.itemSelectionChanged.connect(self.on_subject_changed)
+        self.detailed_results_checkbox.toggled.connect(self._on_detailed_results_toggled)
+        self.visualize_skin_checkbox.toggled.connect(self._on_visualize_skin_toggled)
         self.nonroi_method_combo.currentIndexChanged.connect(self._update_nonroi_stacked)
         self.roi_method_spherical.toggled.connect(self.update_roi_method)
         self.roi_method_cortical.toggled.connect(self.update_roi_method)
@@ -341,6 +402,8 @@ class FlexSearchTab(QtWidgets.QWidget):
         self.roi_method_spherical.toggled.connect(self._update_nonroi_stacked)
         self.roi_method_cortical.toggled.connect(self._update_nonroi_stacked)
         self.roi_method_subcortical.toggled.connect(self._update_nonroi_stacked)
+        self.roi_space_subject.toggled.connect(self._update_coordinate_space_labels)
+        self.roi_space_mni.toggled.connect(self._update_coordinate_space_labels)
         self.view_t1_btn.clicked.connect(self.load_t1_in_freeview)
         
         # Find available subjects (which will trigger finding EEG nets and atlases)
@@ -423,8 +486,19 @@ class FlexSearchTab(QtWidgets.QWidget):
         # Electrode Parameters
         self.electrode_params_group = QtWidgets.QGroupBox("Electrode Parameters")
         electrode_params_layout = QtWidgets.QFormLayout(self.electrode_params_group)
-        electrode_params_layout.addRow(self.radius_label, self.radius_input)
         electrode_params_layout.addRow(self.current_label, self.current_input)
+
+        # Electrode shape
+        shape_layout = QtWidgets.QHBoxLayout()
+        shape_layout.addWidget(self.electrode_shape_rect)
+        shape_layout.addWidget(self.electrode_shape_ellipse)
+        shape_layout.addStretch()
+        electrode_params_layout.addRow(self.electrode_shape_label, shape_layout)
+
+        # Dimensions and thickness
+        electrode_params_layout.addRow(self.dimensions_label, self.dimensions_input)
+        electrode_params_layout.addRow(self.thickness_label, self.thickness_input)
+
         right_column_layout.addWidget(self.electrode_params_group)
         
         top_row_layout.addWidget(right_column_widget, 1)
@@ -454,9 +528,19 @@ class FlexSearchTab(QtWidgets.QWidget):
         spherical_roi_layout.setVerticalSpacing(3)  # Reduce vertical spacing between form rows
         spherical_roi_layout.setContentsMargins(0, 5, 0, 5)  # Reduce top/bottom margins
         
+        # Add coordinate space selection
+        space_selection_widget = QtWidgets.QWidget()
+        space_selection_layout = QtWidgets.QHBoxLayout(space_selection_widget)
+        space_selection_layout.setContentsMargins(0, 0, 0, 0)
+        space_selection_layout.addWidget(QtWidgets.QLabel("Coordinate Space:"))
+        space_selection_layout.addWidget(self.roi_space_subject)
+        space_selection_layout.addWidget(self.roi_space_mni)
+        space_selection_layout.addStretch()
+        spherical_roi_layout.addRow(space_selection_widget)
+
         # Add info label for MNI coordinates (initially hidden)
         self.mni_info_label = QtWidgets.QLabel()
-        self.mni_info_label.setText("Multiple subjects selected: Coordinates will be treated as MNI space and transformed to each subject's native space.")
+        self.mni_info_label.setText("Coordinates will be treated as MNI space and transformed to each subject's native space.")
         self.mni_info_label.setStyleSheet("background-color: #E3F2FD; color: #1976D2; padding: 8px; border-radius: 4px; font-size: 11px;")
         self.mni_info_label.setWordWrap(True)
         self.mni_info_label.setVisible(False)
@@ -588,11 +672,66 @@ class FlexSearchTab(QtWidgets.QWidget):
         scroll_layout.addWidget(self.focality_group)
 
         self.stability_group = QtWidgets.QGroupBox("Hyper Parameters")
-        stability_layout = QtWidgets.QFormLayout(self.stability_group)
-        stability_layout.addRow(self.n_multistart_label, self.n_multistart_input)
-        stability_layout.addRow(self.max_iterations_label, self.max_iterations_input)
-        stability_layout.addRow(self.population_size_label, self.population_size_input)
-        stability_layout.addRow(self.cpus_label, self.cpus_input)
+        stability_layout = QtWidgets.QGridLayout(self.stability_group)
+
+        # Left column (General parameters)
+        row = 0
+        stability_layout.addWidget(self.n_multistart_label, row, 0)
+        stability_layout.addWidget(self.n_multistart_input, row, 1)
+
+        row += 1
+        stability_layout.addWidget(self.max_iterations_label, row, 0)
+        stability_layout.addWidget(self.max_iterations_input, row, 1)
+
+        row += 1
+        stability_layout.addWidget(self.population_size_label, row, 0)
+        stability_layout.addWidget(self.population_size_input, row, 1)
+
+        row += 1
+        stability_layout.addWidget(self.cpus_label, row, 0)
+        stability_layout.addWidget(self.cpus_input, row, 1)
+
+        # Right column (Differential evolution parameters)
+        row = 0
+        stability_layout.addWidget(self.tolerance_label, row, 2)
+        stability_layout.addWidget(self.tolerance_input, row, 3)
+
+        row += 1
+        stability_layout.addWidget(self.mutation_label, row, 2)
+        # Create horizontal layout for mutation min/max inputs
+        mutation_layout = QtWidgets.QHBoxLayout()
+        mutation_layout.addWidget(self.mutation_min_input)
+        mutation_layout.addWidget(QtWidgets.QLabel("to"))
+        mutation_layout.addWidget(self.mutation_max_input)
+        mutation_layout.setContentsMargins(0, 0, 0, 0)
+        mutation_widget = QtWidgets.QWidget()
+        mutation_widget.setLayout(mutation_layout)
+        stability_layout.addWidget(mutation_widget, row, 3)
+
+        row += 1
+        stability_layout.addWidget(self.recombination_label, row, 2)
+        stability_layout.addWidget(self.recombination_input, row, 3)
+
+        # Detailed results checkbox in right column below recombination
+        row += 1
+        stability_layout.addWidget(self.detailed_results_checkbox, row, 2, 1, 2)
+
+        # Visualize skin region checkbox
+        row += 1
+        stability_layout.addWidget(self.visualize_skin_checkbox, row, 2, 1, 2)
+
+        # Skin net selection (only visible when skin visualization is enabled)
+        row += 1
+        stability_layout.addWidget(self.skin_net_label, row, 2)
+        stability_layout.addWidget(self.skin_net_combo, row, 3)
+
+        # Add some spacing between columns
+        stability_layout.setColumnMinimumWidth(1, 120)
+        stability_layout.setColumnMinimumWidth(3, 120)
+        stability_layout.setColumnStretch(1, 1)
+        stability_layout.setColumnStretch(3, 1)
+        stability_layout.setHorizontalSpacing(20)
+
         scroll_layout.addWidget(self.stability_group)
 
         scroll_area.setWidget(scroll_content)
@@ -690,6 +829,7 @@ class FlexSearchTab(QtWidgets.QWidget):
         
         self.eeg_nets = {}
         self.eeg_net_combo.clear()
+        self.skin_net_combo.clear()
         
         # Get the first selected subject (for consistency when multiple are selected)
         selected_items = self.subject_list.selectedItems()
@@ -712,18 +852,28 @@ class FlexSearchTab(QtWidgets.QWidget):
                     net_name = os.path.splitext(os.path.basename(eeg_file))[0]
                     self.eeg_nets[net_name] = eeg_file
                     self.eeg_net_combo.addItem(net_name)
-                
-                if self.eeg_nets:
-                    if self.debug_mode:
-                        self.output_text.append(f"Found {len(self.eeg_nets)} EEG net templates for subject {subject_id}.")
+                    self.skin_net_combo.addItem(net_name)
+
+                # Set default for skin visualization combo
+                if "GSN-HydroCel-185" in self.eeg_nets:
+                    # If GSN-HydroCel-185 exists, select it as default
+                    index = self.skin_net_combo.findText("GSN-HydroCel-185")
+                    if index >= 0:
+                        self.skin_net_combo.setCurrentIndex(index)
+                elif self.eeg_nets:
+                    # If GSN-HydroCel-185 doesn't exist but other nets do, select first one
+                    self.skin_net_combo.setCurrentIndex(0)
                 else:
+                    # No nets found, add default
                     if self.debug_mode:
                         self.output_text.append(f"No EEG net templates found for subject {subject_id}.")
                     self.eeg_net_combo.addItem("EGI_256")  # Default option
+                    self.skin_net_combo.addItem("GSN-HydroCel-185")  # Default option for skin visualization
             else:
                 if self.debug_mode:
                     self.output_text.append(f"EEG positions directory not found for subject {subject_id}.")
                 self.eeg_net_combo.addItem("EGI_256")  # Default option
+                self.skin_net_combo.addItem("GSN-HydroCel-185")  # Default option for skin visualization
         
         except Exception as e:
             self.output_text.append(f"Error scanning for EEG nets: {str(e)}")
@@ -837,44 +987,41 @@ class FlexSearchTab(QtWidgets.QWidget):
         self._update_coordinate_space_labels()
 
     def _update_coordinate_space_labels(self):
-        """Update coordinate space labels and tooltips based on subject selection."""
-        selected_items = self.subject_list.selectedItems()
-        multiple_subjects = len(selected_items) > 1
-        
+        """Update coordinate space labels and tooltips based on space selection."""
         if self.roi_method_spherical.isChecked():
-            if multiple_subjects:
-                # Multiple subjects: use MNI coordinates
+            if self.roi_space_mni.isChecked():
+                # MNI space selected
                 self.roi_coords_label.setText("ROI Center MNI Coordinates (mm):")
                 self.roi_coords_label.setToolTip("MNI space coordinates (will be transformed to subject space for each subject)")
                 self.roi_coords_label.setStyleSheet("color: #007ACC; font-weight: bold;")
-                
+
                 # Show MNI info label
                 if hasattr(self, 'mni_info_label'):
                     self.mni_info_label.setVisible(True)
-                
+
                 # Update individual coordinate tooltips
                 self.roi_x_input.setToolTip("X coordinate in MNI space")
                 self.roi_y_input.setToolTip("Y coordinate in MNI space")
                 self.roi_z_input.setToolTip("Z coordinate in MNI space")
-                
+
                 # Update Freeview button for MNI template
                 self.view_t1_btn.setText("View MNI Template")
                 self.view_t1_btn.setToolTip("Open MNI152 template to find MNI coordinates")
             else:
-                # Single subject: use subject coordinates
+                # Subject space selected
                 self.roi_coords_label.setText("ROI Center RAS Coordinates (mm):")
                 self.roi_coords_label.setToolTip("Subject-specific RAS coordinates")
                 self.roi_coords_label.setStyleSheet("")
-                
+
                 # Hide MNI info label
                 if hasattr(self, 'mni_info_label'):
                     self.mni_info_label.setVisible(False)
-                
+
                 # Update individual coordinate tooltips
                 self.roi_x_input.setToolTip("X coordinate in subject RAS space")
                 self.roi_y_input.setToolTip("Y coordinate in subject RAS space")
                 self.roi_z_input.setToolTip("Z coordinate in subject RAS space")
-                
+
                 # Update Freeview button for subject T1
                 self.view_t1_btn.setText("View T1 in Freeview")
                 self.view_t1_btn.setToolTip("Open subject's T1 scan in Freeview to find RAS coordinates")
@@ -905,18 +1052,27 @@ class FlexSearchTab(QtWidgets.QWidget):
         if not selected_items:
             QtWidgets.QMessageBox.warning(self, "Warning", "Please select at least one subject.")
             return
-            
-        if not self.eeg_net_combo.currentText():
+
+        # Only require EEG net when mapping is enabled
+        if self.run_mapped_simulation_checkbox.isChecked() and not self.eeg_net_combo.currentText():
             QtWidgets.QMessageBox.warning(self, "Warning", "Please select an EEG net.")
             return
         
-        # Check coordinate space for spherical ROI with multiple subjects
-        multiple_subjects = len(selected_items) > 1
-        if multiple_subjects and self.roi_method_spherical.isChecked():
+        # Check if visualize skin region is enabled but no skin net is selected
+        if self.visualize_skin_checkbox.isChecked() and not self.skin_net_combo.currentText():
+            QtWidgets.QMessageBox.warning(
+                self, "Warning",
+                "Visualizing valid skin region requires selecting an EEG net for visualization.\n\n"
+                "Please select a visualization EEG net."
+            )
+            return
+
+        # Check coordinate space for spherical ROI with MNI space selected
+        if self.roi_method_spherical.isChecked() and self.roi_space_mni.isChecked():
             # Show info about MNI coordinate usage
             reply = QtWidgets.QMessageBox.question(
-                self, "MNI Coordinates", 
-                "You have selected multiple subjects with spherical ROI.\n\n"
+                self, "MNI Coordinates",
+                "You have selected MNI space for spherical ROI.\n\n"
                 "The coordinates you entered will be treated as MNI space coordinates "
                 "and will be automatically transformed to each subject's native space.\n\n"
                 "Do you want to continue?",
@@ -968,8 +1124,10 @@ class FlexSearchTab(QtWidgets.QWidget):
         goal = self.goal_combo.currentData()
         postproc = self.postproc_combo.currentData()
         eeg_net = self.eeg_net_combo.currentText()
-        electrode_radius = self.radius_input.value()
         electrode_current = self.current_input.value()
+        electrode_shape = "rect" if self.electrode_shape_rect.isChecked() else "ellipse"
+        dimensions = self.dimensions_input.text() or "8,8"  # Default to 8,8 if empty
+        thickness = self.thickness_input.text() or "4"  # Default to 4 if empty
 
         # Show confirmation dialog
         roi_description = ""
@@ -985,8 +1143,10 @@ class FlexSearchTab(QtWidgets.QWidget):
                   f"ROI: {roi_description}\n"
                   f"Goal: {goal}\n"
                   f"EEG Net: {eeg_net}\n"
-                  f"Electrode radius: {electrode_radius}mm\n"
-                  f"Current: {electrode_current}mA")
+                  f"Current: {electrode_current}mA\n"
+                  f"Electrode shape: {electrode_shape}\n"
+                  f"Dimensions: {dimensions}mm\n"
+                  f"Thickness: {thickness}mm")
         
         if not ConfirmationDialog.confirm(
             self,
@@ -1020,8 +1180,10 @@ class FlexSearchTab(QtWidgets.QWidget):
         self.goal = goal
         self.postproc = postproc
         self.eeg_net = eeg_net
-        self.electrode_radius = electrode_radius
         self.electrode_current = electrode_current
+        self.electrode_shape = electrode_shape
+        self.dimensions = dimensions
+        self.thickness = thickness
         
         # Start processing the first subject
         self._process_next_subject()
@@ -1040,8 +1202,9 @@ class FlexSearchTab(QtWidgets.QWidget):
         
         # Run optimization for this subject
         success = self._run_single_subject_optimization(
-            subject_id, self.roi_params, self.goal, self.postproc, 
-            self.eeg_net, self.electrode_radius, self.electrode_current
+            subject_id, self.roi_params, self.goal, self.postproc,
+            self.eeg_net, self.electrode_current,
+            self.electrode_shape, self.dimensions, self.thickness
         )
         
         if not success:
@@ -1071,10 +1234,14 @@ class FlexSearchTab(QtWidgets.QWidget):
             delattr(self, 'postproc')
         if hasattr(self, 'eeg_net'):
             delattr(self, 'eeg_net')
-        if hasattr(self, 'electrode_radius'):
-            delattr(self, 'electrode_radius')
         if hasattr(self, 'electrode_current'):
             delattr(self, 'electrode_current')
+        if hasattr(self, 'electrode_shape'):
+            delattr(self, 'electrode_shape')
+        if hasattr(self, 'dimensions'):
+            delattr(self, 'dimensions')
+        if hasattr(self, 'thickness'):
+            delattr(self, 'thickness')
         
         # Reset state
         self.optimization_running = False
@@ -1085,7 +1252,7 @@ class FlexSearchTab(QtWidgets.QWidget):
         if hasattr(self, 'parent') and self.parent:
             self.parent.set_tab_busy(self, False, stop_btn=self.stop_btn)
 
-    def _run_single_subject_optimization(self, subject_id, roi_params, goal, postproc, eeg_net, electrode_radius, electrode_current):
+    def _run_single_subject_optimization(self, subject_id, roi_params, goal, postproc, eeg_net, electrode_current, electrode_shape, dimensions, thickness):
         """Run optimization for a single subject. Returns True if started successfully, False otherwise."""
         try:
             # Don't set optimization_running here - it's managed in run_optimization
@@ -1123,8 +1290,8 @@ class FlexSearchTab(QtWidgets.QWidget):
                 env['ROI_Y'] = str(roi_params['center'][1])
                 env['ROI_Z'] = str(roi_params['center'][2])
                 env['ROI_RADIUS'] = str(roi_params['radius'])
-                # Indicate if these are MNI coordinates (for multiple subjects)
-                env['USE_MNI_COORDS'] = 'true' if len(self.selected_subjects) > 1 else 'false'
+                # Indicate if these are MNI coordinates based on user selection
+                env['USE_MNI_COORDS'] = 'true' if self.roi_space_mni.isChecked() else 'false'
             elif roi_params['method'] == "atlas":
                 atlas_display_for_env = roi_params['atlas']
                 # Extract just the atlas type (e.g., "DK40") and construct subject-specific name
@@ -1173,17 +1340,18 @@ class FlexSearchTab(QtWidgets.QWidget):
             cmd = [
                 "simnibs_python", "-m", "opt.flex",
                 "--subject", subject_id,
-                "--goal", goal, 
+                "--goal", goal,
                 "--postproc", postproc,
-                "--eeg-net", eeg_net,
-                "--radius", str(electrode_radius),
                 "--current", str(electrode_current),
+                "--electrode-shape", electrode_shape,
+                "--dimensions", dimensions,
+                "--thickness", thickness,
                 "--roi-method", roi_params['method']
             ]
 
             # Mapping options
             if self.run_mapped_simulation_checkbox.isChecked():
-                cmd.append("--enable-mapping")
+                cmd.extend(["--enable-mapping", "--eeg-net", eeg_net])
                 # When run_mapped_simulation is checked, we always run the mapping simulation
                 # (no need for --disable-mapping-simulation)
 
@@ -1209,8 +1377,8 @@ class FlexSearchTab(QtWidgets.QWidget):
                     
                     # Run adaptive focality optimization
                     return self._run_adaptive_focality_optimization(
-                        subject_id, roi_params, postproc, eeg_net, 
-                        electrode_radius, electrode_current, env, cmd[:-1]  # Remove roi-method from base cmd
+                        subject_id, roi_params, postproc, eeg_net,
+                        electrode_current, electrode_shape, dimensions, thickness, env, cmd[:-1]  # Remove roi-method from base cmd
                     )
                 else:
                     # Standard focality optimization
@@ -1269,6 +1437,35 @@ class FlexSearchTab(QtWidgets.QWidget):
             cmd.extend(["--population-size", str(self.population_size_input.value())])
             cmd.extend(["--cpus", str(self.cpus_input.value())])
 
+            # Differential evolution optimizer parameters
+            cmd.extend(["--tolerance", str(self.tolerance_input.value())])
+
+            # Mutation parameter as "min,max" string
+            mutation_str = f"{self.mutation_min_input.value()},{self.mutation_max_input.value()}"
+            cmd.extend(["--mutation", mutation_str])
+
+            cmd.extend(["--recombination", str(self.recombination_input.value())])
+
+            # Detailed results flag
+            if self.detailed_results_checkbox.isChecked():
+                cmd.append("--detailed-results")
+
+            # Visualize valid skin region flag
+            if self.visualize_skin_checkbox.isChecked():
+                cmd.append("--visualize-valid-skin-region")
+                # Add skin visualization net if selected
+                skin_net = self.skin_net_combo.currentText()
+                if skin_net:
+                    skin_net_path = self.eeg_nets.get(skin_net)
+                    if skin_net_path:
+                        cmd.extend(["--skin-visualization-net", skin_net_path])
+                    else:
+                        # Fallback for default nets that don't have a file path
+                        default_path = os.path.join(script_project_dir, 'derivatives', 'SimNIBS',
+                                                  f'sub-{subject_id}', f'm2m_{subject_id}',
+                                                  'eeg_positions', f'{skin_net}.csv')
+                        cmd.extend(["--skin-visualization-net", default_path])
+
             # Only show setup messages in debug mode
             if self.debug_mode:
                 self.output_text.append(f"Running optimization for subject {subject_id} (this may take a while)...")
@@ -1296,15 +1493,17 @@ class FlexSearchTab(QtWidgets.QWidget):
             self.update_output(f"Error executing optimization for subject {subject_id}: {str(e)}", 'error')
             return False
 
-    def _build_confirmation_details(self, subject_id, roi_params, goal, postproc, eeg_net, electrode_radius, electrode_current):
+    def _build_confirmation_details(self, subject_id, roi_params, goal, postproc, eeg_net, electrode_current):
         """Build confirmation dialog details string."""
         details = (f"This will run flex-search optimization with the following parameters:\n\n" +
                    f"• Subject: {subject_id}\n" +
                    f"• EEG Net: {eeg_net}\n" +
                    f"• Optimization Goal: {self.goal_combo.currentText()} ({goal})\n" +
                    f"• Post-processing: {self.postproc_combo.currentText()} ({postproc})\n" +
-                   f"• Electrode Radius: {electrode_radius} mm\n" +
                    f"• Electrode Current: {electrode_current} mA\n" +
+                   f"• Electrode Shape: {electrode_shape}\n" +
+                   f"• Dimensions: {dimensions} mm\n" +
+                   f"• Thickness: {thickness} mm\n" +
                    f"• ROI Method: {'Spherical' if roi_params['method'] == 'spherical' else 'Cortical' if roi_params['method'] == 'atlas' else 'Subcortical'}\n")
         
         if roi_params['method'] == 'spherical':
@@ -1330,11 +1529,19 @@ class FlexSearchTab(QtWidgets.QWidget):
         details += f"• Max Iterations: {self.max_iterations_input.value()}\n"
         details += f"• Population Size: {self.population_size_input.value()}\n"
         details += f"• Number of CPUs: {self.cpus_input.value()}\n"
-        
+
+        details += f"\nDifferential Evolution Parameters:\n"
+        details += f"• Tolerance: {self.tolerance_input.value()}\n"
+        details += f"• Mutation: [{self.mutation_min_input.value()}, {self.mutation_max_input.value()}]\n"
+        details += f"• Recombination: {self.recombination_input.value()}\n"
+
+        if self.detailed_results_checkbox.isChecked():
+            details += f"• Detailed Results: ✓ ENABLED (creates additional visualization files)\n"
+
         if self.n_multistart_input.value() > 1:
             details += f"\n Multi-Start Optimization: {self.n_multistart_input.value()} runs will be performed.\n"
             details += f"The best result (minimum objective function value) will be automatically selected and kept.\n"
-        
+
         return details
 
 
@@ -1587,6 +1794,23 @@ class FlexSearchTab(QtWidgets.QWidget):
         is_mapping_enabled = self.run_mapped_simulation_checkbox.isChecked()
         self.eeg_net_widget.setVisible(is_mapping_enabled)
         self.eeg_net_label.setVisible(is_mapping_enabled)
+
+    def _on_detailed_results_toggled(self):
+        """Handle detailed results checkbox state change."""
+        is_detailed_results = self.detailed_results_checkbox.isChecked()
+        self.visualize_skin_checkbox.setEnabled(is_detailed_results)
+        if not is_detailed_results:
+            self.visualize_skin_checkbox.setChecked(False)
+            # Also disable skin net combo when detailed results is disabled
+            self.skin_net_combo.setEnabled(False)
+
+    def _on_visualize_skin_toggled(self):
+        """Handle visualize skin checkbox state change."""
+        is_visualize_skin = self.visualize_skin_checkbox.isChecked()
+        self.skin_net_combo.setEnabled(is_visualize_skin)
+        # Clear selection if disabled
+        if not is_visualize_skin:
+            self.skin_net_combo.setCurrentIndex(-1)
 
     def _update_focality_visibility(self):
         is_focality = self.goal_combo.currentData() == "focality"
@@ -1846,8 +2070,11 @@ class FlexSearchTab(QtWidgets.QWidget):
         self.refresh_eeg_nets_btn.setEnabled(False)
         
         # Disable electrode parameters
-        self.radius_input.setEnabled(False)
         self.current_input.setEnabled(False)
+        self.electrode_shape_rect.setEnabled(False)
+        self.electrode_shape_ellipse.setEnabled(False)
+        self.dimensions_input.setEnabled(False)
+        self.thickness_input.setEnabled(False)
         
         # Disable simulation options
         self.run_final_electrode_simulation_checkbox.setEnabled(False)
@@ -1904,6 +2131,12 @@ class FlexSearchTab(QtWidgets.QWidget):
         self.max_iterations_input.setEnabled(False)
         self.population_size_input.setEnabled(False)
         self.cpus_input.setEnabled(False)
+        self.tolerance_input.setEnabled(False)
+        self.mutation_min_input.setEnabled(False)
+        self.mutation_max_input.setEnabled(False)
+        self.recombination_input.setEnabled(False)
+        self.detailed_results_checkbox.setEnabled(False)
+        self.visualize_skin_checkbox.setEnabled(False)
         
         # Keep debug checkbox enabled during processing
         if hasattr(self, 'console_widget') and hasattr(self.console_widget, 'debug_checkbox'):
@@ -1924,8 +2157,11 @@ class FlexSearchTab(QtWidgets.QWidget):
         self.refresh_eeg_nets_btn.setEnabled(True)
         
         # Enable electrode parameters
-        self.radius_input.setEnabled(True)
         self.current_input.setEnabled(True)
+        self.electrode_shape_rect.setEnabled(True)
+        self.electrode_shape_ellipse.setEnabled(True)
+        self.dimensions_input.setEnabled(True)
+        self.thickness_input.setEnabled(True)
         
         # Enable simulation options
         self.run_final_electrode_simulation_checkbox.setEnabled(True)
@@ -1982,6 +2218,12 @@ class FlexSearchTab(QtWidgets.QWidget):
         self.max_iterations_input.setEnabled(True)
         self.population_size_input.setEnabled(True)
         self.cpus_input.setEnabled(True)
+        self.tolerance_input.setEnabled(True)
+        self.mutation_min_input.setEnabled(True)
+        self.mutation_max_input.setEnabled(True)
+        self.recombination_input.setEnabled(True)
+        self.detailed_results_checkbox.setEnabled(True)
+        self.visualize_skin_checkbox.setEnabled(True)
 
     def optimization_finished_early_due_to_error(self):
         """Resets UI controls if optimization cannot start due to an error."""
@@ -1992,8 +2234,8 @@ class FlexSearchTab(QtWidgets.QWidget):
         if hasattr(self, 'parent') and self.parent:
             self.parent.set_tab_busy(self, False, stop_btn=self.stop_btn)
 
-    def _run_adaptive_focality_optimization(self, subject_id, roi_params, postproc, eeg_net, 
-                                          electrode_radius, electrode_current, env, base_cmd):
+    def _run_adaptive_focality_optimization(self, subject_id, roi_params, postproc, eeg_net,
+                                          electrode_current, electrode_shape, dimensions, thickness, env, base_cmd):
         """Run adaptive focality optimization: first run mean optimization to get achievable intensity,
         then calculate adaptive thresholds and run focality optimization."""
         
@@ -2008,9 +2250,11 @@ class FlexSearchTab(QtWidgets.QWidget):
                 'roi_params': roi_params,
                 'postproc': postproc,
                 'eeg_net': eeg_net,
-                'electrode_radius': electrode_radius,
-                'electrode_current': electrode_current,
-                'env': env,
+            'electrode_current': electrode_current,
+            'electrode_shape': electrode_shape,
+            'dimensions': dimensions,
+            'thickness': thickness,
+            'env': env,
                 'base_cmd': base_cmd
             }
             
@@ -2026,7 +2270,7 @@ class FlexSearchTab(QtWidgets.QWidget):
             
             # Add mapping options to mean command
             if self.run_mapped_simulation_checkbox.isChecked():
-                mean_cmd.append("--enable-mapping")
+                mean_cmd.extend(["--enable-mapping", "--eeg-net", eeg_net])
                 # When run_mapped_simulation is checked, we always run the mapping simulation
             
             # Run mean optimization with enhanced output monitoring
@@ -2096,8 +2340,10 @@ class FlexSearchTab(QtWidgets.QWidget):
             roi_params = params['roi_params']
             postproc = params['postproc']
             eeg_net = params['eeg_net']
-            electrode_radius = params['electrode_radius']
             electrode_current = params['electrode_current']
+            electrode_shape = params['electrode_shape']
+            dimensions = params['dimensions']
+            thickness = params['thickness']
             env = params['env']
             base_cmd = params['base_cmd']
             
@@ -2138,7 +2384,7 @@ class FlexSearchTab(QtWidgets.QWidget):
             
             # Add mapping options to focality command
             if self.run_mapped_simulation_checkbox.isChecked():
-                focality_cmd.append("--enable-mapping")
+                focality_cmd.extend(["--enable-mapping", "--eeg-net", eeg_net])
                 # When run_mapped_simulation is checked, we always run the mapping simulation
                     
             # Add non-ROI specific parameters if needed
@@ -2194,8 +2440,8 @@ class FlexSearchTab(QtWidgets.QWidget):
             env['VOLUME_NON_ROI_ATLAS_PATH'] = nonroi_volume_atlas_path_for_env
             env['VOLUME_NON_ROI_LABEL'] = str(self.nonroi_volume_label_input.value())
     
-    def _on_mean_optimization_finished(self, subject_id, roi_params, postproc, eeg_net, 
-                                     electrode_radius, electrode_current, env, base_cmd):
+    def _on_mean_optimization_finished(self, subject_id, roi_params, postproc, eeg_net,
+                                     electrode_current, electrode_shape, dimensions, thickness, env, base_cmd):
         """Handle completion of mean optimization and start focality optimization with adaptive thresholds."""
         
         try:
@@ -2234,7 +2480,7 @@ class FlexSearchTab(QtWidgets.QWidget):
             
             # Add mapping options to focality command
             if self.run_mapped_simulation_checkbox.isChecked():
-                focality_cmd.append("--enable-mapping")
+                focality_cmd.extend(["--enable-mapping", "--eeg-net", eeg_net])
                 # When run_mapped_simulation is checked, we always run the mapping simulation
                     
             # Add non-ROI specific parameters if needed

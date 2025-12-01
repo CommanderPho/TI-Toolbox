@@ -16,6 +16,7 @@ import sys
 from typing import TYPE_CHECKING
 
 from simnibs import opt_struct
+from simnibs.optimization.tes_flex_optimization.electrode_layout import ElectrodeArrayPair
 
 if TYPE_CHECKING:
     pass
@@ -50,12 +51,16 @@ def parse_arguments() -> argparse.Namespace:
                    help="Optimization goal")
     p.add_argument("--postproc", choices=["max_TI", "dir_TI_normal", "dir_TI_tangential"],
                    required=True, help="Post-processing method")
-    p.add_argument("--eeg-net", required=True,
-                   help="CSV filename in eeg_positions (without .csv)")
-    p.add_argument("--radius", type=float, required=True,
-                   help="Electrode radius in mm")
+    p.add_argument("--eeg-net",
+                   help="CSV filename in eeg_positions (without .csv). Required when --enable-mapping is used.")
     p.add_argument("--current", type=float, required=True,
                    help="Electrode current in mA")
+    p.add_argument("--electrode-shape", choices=["rect", "ellipse"], required=True,
+                   help="Electrode shape (rect or ellipse)")
+    p.add_argument("--dimensions", type=str, required=True,
+                   help="Electrode dimensions in mm (x,y format, e.g., '8,8')")
+    p.add_argument("--thickness", type=float, required=True,
+                   help="Electrode thickness in mm")
     p.add_argument("--roi-method", choices=["spherical", "atlas", "subcortical"],
                    required=True, help="ROI definition method")
 
@@ -86,6 +91,22 @@ def parse_arguments() -> argparse.Namespace:
                    help="Population size for differential_evolution")
     p.add_argument("--cpus", type=int,
                    help="Number of CPU cores to utilize")
+
+    # Differential evolution optimizer parameters
+    p.add_argument("--tolerance", type=float,
+                   help="Tolerance for differential_evolution convergence (tol parameter)")
+    p.add_argument("--mutation", type=str,
+                   help="Mutation parameter for differential_evolution (single value or 'min,max' range)")
+    p.add_argument("--recombination", type=float,
+                   help="Recombination parameter for differential_evolution")
+
+    # Output control
+    p.add_argument("--detailed-results", action="store_true",
+                   help="Enable detailed results output (creates additional visualization and debug files)")
+    p.add_argument("--visualize-valid-skin-region", action="store_true",
+                   help="Create visualizations of valid skin region for electrode placement (requires --detailed-results)")
+    p.add_argument("--skin-visualization-net",
+                   help="EEG net CSV file to use for skin visualization (shows electrode positions on valid/invalid skin regions)")
 
     return p.parse_args()
 
@@ -132,12 +153,20 @@ def build_optimization(args: argparse.Namespace) -> opt_struct.TesFlexOptimizati
 
     opt.e_postproc = args.postproc
     opt.open_in_gmsh = False  # Never auto-launch GUI
-    
+
     # Final electrode simulation control
     opt.run_final_electrode_simulation = (
-        args.run_final_electrode_simulation and 
+        args.run_final_electrode_simulation and
         not args.skip_final_electrode_simulation
     )
+
+    # Detailed results control
+    if hasattr(args, 'detailed_results') and args.detailed_results:
+        opt.detailed_results = True
+
+    # Skin visualization control
+    if hasattr(args, 'visualize_valid_skin_region') and args.visualize_valid_skin_region:
+        opt.visualize_valid_skin_region = True
 
     # Configure mapping
     if args.enable_mapping:
@@ -154,13 +183,44 @@ def build_optimization(args: argparse.Namespace) -> opt_struct.TesFlexOptimizati
         # This prevents AttributeError in SimNIBS logging code
         opt.electrode_mapping = None
 
+    # Configure skin visualization net file (separate from mapping)
+    if hasattr(args, 'skin_visualization_net') and args.skin_visualization_net:
+        opt.net_electrode_file = args.skin_visualization_net
+        if not os.path.isfile(opt.net_electrode_file):
+            raise SystemExit(f"Skin visualization EEG net file not found: {opt.net_electrode_file}")
+
     # Configure electrodes
-    r_m = args.radius
     c_A = args.current / 1000.0  # mA → A
+    electrode_shape = args.electrode_shape
+    dimensions = [float(x) for x in args.dimensions.split(',')]
+    thickness = args.thickness
+
+    # Calculate effective radius from dimensions for ElectrodeArrayPair layout
+    # For circular electrodes, use average of dimensions; for rectangular, use max dimension
+    if electrode_shape == "ellipse":
+        effective_radius = (dimensions[0] + dimensions[1]) / 4.0  # Average dimension / 2
+    else:  # rectangle
+        effective_radius = max(dimensions) / 2.0  # Max dimension / 2
+
+    # Create electrode pairs for TI stimulation (2 pairs)
+    electrode_pairs = []
     for _ in range(2):  # Two pairs for TI
-        el = opt.add_electrode_layout("ElectrodeArrayPair")
-        el.radius = [r_m]
-        el.current = [c_A, -c_A]
+        electrode_pair = ElectrodeArrayPair()
+
+        # Set electrode shape and dimensions for plotting
+        if electrode_shape == "ellipse":
+            electrode_pair.radius = [effective_radius]
+            electrode_pair.dimensions = [dimensions[0], dimensions[1]]
+        else:  # rectangle
+            electrode_pair.radius = [0]  # No radius for rectangular
+            electrode_pair.length_x = [dimensions[0]]
+            electrode_pair.length_y = [dimensions[1]]
+
+        electrode_pair.current = [c_A, -c_A]
+        electrode_pairs.append(electrode_pair)
+
+    # Add to optimization
+    opt.electrode = electrode_pairs
 
     # Configure ROI
     roi.configure_roi(opt, args)
@@ -174,24 +234,57 @@ def configure_optimizer_options(
     logger
 ) -> None:
     """Configure optimizer options for the optimization object.
-    
+
     Args:
         opt: SimNIBS optimization object
         args: Parsed command line arguments
         logger: Logger instance
     """
+    # Check if optimizer options exist
+    if not hasattr(opt, '_optimizer_options_std') or not isinstance(opt._optimizer_options_std, dict):
+        logger.warning("opt._optimizer_options_std not found or not a dict, cannot configure optimizer options.")
+        return
+
     # Apply max_iterations if provided
     if args.max_iterations is not None:
-        if hasattr(opt, '_optimizer_options_std') and isinstance(opt._optimizer_options_std, dict):
-            opt._optimizer_options_std["maxiter"] = args.max_iterations
-            logger.debug(f"Set max iterations to {args.max_iterations}")
-        else:
-            logger.warning("opt._optimizer_options_std not found or not a dict, cannot set maxiter.")
-    
+        opt._optimizer_options_std["maxiter"] = args.max_iterations
+        logger.debug(f"Set max iterations to {args.max_iterations}")
+
     # Apply population_size if provided
     if args.population_size is not None:
-        if hasattr(opt, '_optimizer_options_std') and isinstance(opt._optimizer_options_std, dict):
-            opt._optimizer_options_std["popsize"] = args.population_size
-            logger.debug(f"Set population size to {args.population_size}")
+        opt._optimizer_options_std["popsize"] = args.population_size
+        logger.debug(f"Set population size to {args.population_size}")
+
+    # Apply tolerance if provided
+    if hasattr(args, 'tolerance') and args.tolerance is not None:
+        opt._optimizer_options_std["tol"] = args.tolerance
+        logger.debug(f"Set tolerance to {args.tolerance}")
+
+    # Apply mutation if provided
+    if hasattr(args, 'mutation') and args.mutation is not None:
+        # Parse mutation parameter - can be single value or min,max range
+        mutation_str = args.mutation.strip()
+        if ',' in mutation_str:
+            # Parse as [min, max] range
+            try:
+                mutation_parts = [float(x.strip()) for x in mutation_str.split(',')]
+                if len(mutation_parts) == 2:
+                    opt._optimizer_options_std["mutation"] = mutation_parts
+                    logger.debug(f"Set mutation to {mutation_parts}")
+                else:
+                    logger.warning(f"Invalid mutation format: {mutation_str}. Expected single value or 'min,max'")
+            except ValueError as e:
+                logger.warning(f"Failed to parse mutation parameter '{mutation_str}': {e}")
         else:
-            logger.warning("opt._optimizer_options_std not found or not a dict, cannot set popsize.")
+            # Parse as single value
+            try:
+                mutation_val = float(mutation_str)
+                opt._optimizer_options_std["mutation"] = mutation_val
+                logger.debug(f"Set mutation to {mutation_val}")
+            except ValueError as e:
+                logger.warning(f"Failed to parse mutation parameter '{mutation_str}': {e}")
+
+    # Apply recombination if provided
+    if hasattr(args, 'recombination') and args.recombination is not None:
+        opt._optimizer_options_std["recombination"] = args.recombination
+        logger.debug(f"Set recombination to {args.recombination}")
