@@ -9,7 +9,30 @@ Complete changelog for all versions of the Temporal Interference Toolbox.
 
 ---
 
-### v2.2.0 (Latest Release)
+### v2.2.1 (Latest Release)
+
+**Release Date**: December 04, 2025
+
+#### Backward compatibility change to be aware:
+- **Electode Mapping**: We changed the mapping functionality from the **flex-seach** to the **simulator**. This to provide a more flexible and dynamic framework. Now, the flex-search outputs the: `electrode_positions.json` file and the mapping functionality happeneds on the simulator side using the new method `ti-toolbox/tools/map_electrodes.py`. Thus, one can use a single flex-search to conveniently map to multiple nets. 
+
+#### Additions
+- **Desktop App**: Recognizing the importance of Desktop delivery, we redesign our executables with Electron. For more info please see `package`.
+- **Benchmarks**: Added benchmarking tool with sensible defaults that users can run on their systems
+- **AMV**: Improved automatic montage visualization that now supports all available nets with a higher resolution image.
+- **Flex-search**: Added more control over electrode geometry now supporting rectengular and width control.
+- **Flex-search**: Exapnded hyper-parameter control. tolerance and mutation rate. 
+
+#### Fixes
+- **Various Bug Fixes**: protection overwrites, documentation, output formatting, UI improvements, parallel processing, electrode management
+
+#### Download Links
+- Docker Image: `docker pull idossha/simnibs:v2.2.1`
+- Source Code: [GitHub Repository](https://github.com/idossha/TI-Toolbox)
+
+---
+
+### v2.2.0
 
 **Release Date**: November 07, 2025
 

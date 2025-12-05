@@ -1,7 +1,7 @@
 {
   "name": "ti-toolbox",
   "productName": "TI-Toolbox",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "description": "Temporal Interference Toolbox - Desktop Application",
   "main": "src/main.js",
   "scripts": {
@@ -20,8 +20,12 @@
     "simnibs",
     "neuroimaging"
   ],
-  "author": "Center for Sleep and Consciousness",
+  "author": {
+    "name": "Ido Haber",
+    "email": "ihaber@wisc.edu"
+  },
   "license": "MIT",
+  "repository": "git+https://github.com/idossha/TI-toolbox.git",
   "devDependencies": {
     "electron": "^28.0.0",
     "electron-builder": "^24.9.1"
@@ -55,6 +59,10 @@
     "mac": {
       "category": "public.app-category.education",
       "icon": "assets/icon.icns",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.inherit.plist",
       "target": [
         {
           "target": "dmg",
@@ -62,31 +70,17 @@
             "x64",
             "arm64"
           ]
-        },
-        {
-          "target": "zip",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
         }
       ],
-      "hardenedRuntime": true,
-      "gatekeeperAssess": false,
-      "entitlements": "build/entitlements.mac.plist",
-      "entitlementsInherit": "build/entitlements.mac.plist"
+      "notarize": {
+        "teamId": "3BMY24SA43"
+      }
     },
     "win": {
       "icon": "assets/icon.ico",
       "target": [
         {
           "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "portable",
           "arch": [
             "x64"
           ]

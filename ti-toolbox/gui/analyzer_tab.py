@@ -383,8 +383,9 @@ class AnalyzerTab(QtWidgets.QWidget):
         self.pairs_table.setColumnCount(3)
         self.pairs_table.setHorizontalHeaderLabels(["Subject", "Simulation", ""])
         self.pairs_table.horizontalHeader().setStretchLastSection(False)
-        self.pairs_table.horizontalHeader().setSectionResizeMode(0, QtWidgets.QHeaderView.Stretch)
+        self.pairs_table.horizontalHeader().setSectionResizeMode(0, QtWidgets.QHeaderView.Fixed)
         self.pairs_table.horizontalHeader().setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)
+        self.pairs_table.setColumnWidth(0, 100) 
         self.pairs_table.setColumnWidth(2, 50)
         self.pairs_table.setMaximumHeight(250)
         pairs_layout.addWidget(self.pairs_table)
@@ -431,6 +432,8 @@ class AnalyzerTab(QtWidgets.QWidget):
 
         # Subject combo
         subject_combo = QtWidgets.QComboBox()
+        subject_combo.setMaxVisibleItems(10)  # Show max 10 items before scrollbar appears
+        subject_combo.setStyleSheet("QComboBox { combobox-popup: 0; } QComboBox QAbstractItemView { max-height: 1000px; }")
         subjects = self.get_all_subjects()
         subject_combo.addItems(subjects)
         subject_combo.currentTextChanged.connect(lambda: self.update_sim_combo_in_row(row))
@@ -438,6 +441,8 @@ class AnalyzerTab(QtWidgets.QWidget):
 
         # Simulation combo
         sim_combo = QtWidgets.QComboBox()
+        sim_combo.setMaxVisibleItems(10)  # Show max 10 items before scrollbar appears
+        sim_combo.setStyleSheet("QComboBox { combobox-popup: 0; } QComboBox QAbstractItemView { max-height: 1000px; }")
         if subjects:
             sims = self.pm.list_simulations(subjects[0])
             sim_combo.addItems(sims)
@@ -512,6 +517,8 @@ class AnalyzerTab(QtWidgets.QWidget):
         sim_layout = QtWidgets.QHBoxLayout()
         sim_layout.addWidget(QtWidgets.QLabel("Simulation:"))
         sim_combo = QtWidgets.QComboBox()
+        sim_combo.setMaxVisibleItems(10)  # Show max 10 items before scrollbar appears
+        sim_combo.setStyleSheet("QComboBox { combobox-popup: 0; } QComboBox QAbstractItemView { max-height: 1000px; }")
 
         # Get all unique simulations across all subjects
         all_sims = set()
@@ -571,6 +578,8 @@ class AnalyzerTab(QtWidgets.QWidget):
 
                 # Subject combo
                 subject_combo_widget = QtWidgets.QComboBox()
+                subject_combo_widget.setMaxVisibleItems(10)  # Show max 10 items before scrollbar appears
+                subject_combo_widget.setStyleSheet("QComboBox { combobox-popup: 0; } QComboBox QAbstractItemView { max-height: 1000px; }")
                 subject_combo_widget.addItems(all_subjects)
                 subject_combo_widget.setCurrentText(subject_id)
                 subject_combo_widget.currentTextChanged.connect(lambda: self.update_sim_combo_in_row(row))
@@ -578,6 +587,8 @@ class AnalyzerTab(QtWidgets.QWidget):
 
                 # Simulation combo
                 sim_combo_widget = QtWidgets.QComboBox()
+                sim_combo_widget.setMaxVisibleItems(10)  # Show max 10 items before scrollbar appears
+                sim_combo_widget.setStyleSheet("QComboBox { combobox-popup: 0; } QComboBox QAbstractItemView { max-height: 1000px; }")
                 sim_combo_widget.addItems(available_sims)
                 sim_combo_widget.setCurrentText(selected_simulation)
                 self.pairs_table.setCellWidget(row, 1, sim_combo_widget)
@@ -821,6 +832,8 @@ class AnalyzerTab(QtWidgets.QWidget):
         subject_label.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         top_row.addWidget(subject_label)
         self.gmsh_subject_combo = QtWidgets.QComboBox()
+        self.gmsh_subject_combo.setMaxVisibleItems(10)  # Show max 10 items before scrollbar appears
+        self.gmsh_subject_combo.setStyleSheet("QComboBox { combobox-popup: 0; } QComboBox QAbstractItemView { max-height: 1000px; }")
         self.gmsh_subject_combo.setMinimumWidth(120)
         self.gmsh_subject_combo.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
         top_row.addWidget(self.gmsh_subject_combo)
@@ -829,6 +842,8 @@ class AnalyzerTab(QtWidgets.QWidget):
         simulation_label.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         top_row.addWidget(simulation_label)
         self.gmsh_sim_combo = QtWidgets.QComboBox()
+        self.gmsh_sim_combo.setMaxVisibleItems(10)  # Show max 10 items before scrollbar appears
+        self.gmsh_sim_combo.setStyleSheet("QComboBox { combobox-popup: 0; } QComboBox QAbstractItemView { max-height: 1000px; }")
         self.gmsh_sim_combo.setMinimumWidth(120)
         self.gmsh_sim_combo.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
         top_row.addWidget(self.gmsh_sim_combo)
@@ -1553,16 +1568,16 @@ class AnalyzerTab(QtWidgets.QWidget):
 
             # Add analysis-specific parameters
             if self.type_spherical.isChecked():
-                coords = [self.coord_x.text().strip() or "0", 
-                         self.coord_y.text().strip() or "0", 
+                coords = [self.coord_x.text().strip() or "0",
+                         self.coord_y.text().strip() or "0",
                          self.coord_z.text().strip() or "0"]
                 radius = self.radius_input.text().strip() or "5"
                 cmd.extend(['--coordinates'] + coords)
                 cmd.extend(['--radius', radius])
-                
-                # Add MNI coordinates flag when MNI space is selected
-                if self.coord_space_mni.isChecked():
-                    cmd.append('--use-mni-coords')
+
+                # Add coordinate space specification
+                coord_space = 'MNI' if self.coord_space_mni.isChecked() else 'subject'
+                cmd.extend(['--coordinate-space', coord_space])
             else:  # cortical
                 if self.space_mesh.isChecked():
                     atlas_name = self.atlas_name_combo.currentText()
@@ -2490,9 +2505,9 @@ class AnalyzerTab(QtWidgets.QWidget):
                 cmd.extend(['--coordinates'] + coords_str)
                 cmd.extend(['--radius', self.radius_input.text().strip() or "5"])
 
-                # Add MNI coordinates flag when MNI space is selected
-                if self.coord_space_mni.isChecked():
-                    cmd.append('--use-mni-coords')
+                # Add coordinate space specification
+                coord_space = 'MNI' if self.coord_space_mni.isChecked() else 'subject'
+                cmd.extend(['--coordinate-space', coord_space])
             else: # Cortical
                 if self.space_mesh.isChecked():
                     cmd.extend(['--atlas_name', self.atlas_name_combo.currentText()])
