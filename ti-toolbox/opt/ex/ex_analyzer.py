@@ -4,16 +4,17 @@ Ex-Search Field Analyzer
 Simplified analyzer specifically for ex-search that extracts all field values within ROI.
 """
 
+# Third-party imports
+import numpy as np
+from simnibs import mesh_io
+
+# Standard library imports
 import csv
 import json
 import os
 import re
 import sys
 import time
-
-# Third-party imports
-import numpy as np
-from simnibs import mesh_io
 
 # Add project root to path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
@@ -53,7 +54,6 @@ def analyze_ex_search(opt_directory, roi_directory, position_files, m2m_dir, log
     total_files = len(msh_files)
     
     logger.info(f"Found {total_files} mesh files to process")
-    logger.info("Using ROI-based field extraction (all elements within 3mm sphere)")
     
     # Process each mesh file
     for i, msh_file in enumerate(msh_files):
