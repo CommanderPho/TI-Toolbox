@@ -29,6 +29,26 @@ BOLD_CYAN='\033[1;36m'
 YELLOW='\033[0;33m' #Yellow for warnings or important notices
 BOLD_YELLOW='\033[1;33m'
 
+# Function to format command array as copyable command line
+format_command_line() {
+    local cmd_array=("$@")
+    local cmd_line=""
+    local first=true
+    
+    for arg in "${cmd_array[@]}"; do
+        if [ "$first" = true ]; then
+            first=false
+        else
+            cmd_line+=" "
+        fi
+        
+        # Use printf %q for proper shell escaping
+        cmd_line+="$(printf '%q' "$arg")"
+    done
+    
+    echo "$cmd_line"
+}
+
 # Function to handle invalid input and reprompt
 reprompt() {
     echo -e "${RED}Invalid input. Please try again.${RESET}"
@@ -266,7 +286,17 @@ except Exception as e:
         # Add end marker
         cmd+=("--")
         
-
+        # Format and print the copyable command
+        local copyable_cmd=$(format_command_line "${cmd[@]}")
+        local env_vars=""
+        
+        # Build environment variables string if needed
+        if [[ "$simulation_framework" == "flex" ]] && [[ -n "$current_flex_file" ]]; then
+            env_vars="FLEX_MONTAGES_FILE=\"$current_flex_file\" "
+        fi
+        if [[ -n "$CONFIG_DIR" ]]; then
+            env_vars+="CONFIG_DIR=\"$CONFIG_DIR\" "
+        fi
         
         echo -e "${GREEN}Executing: ${cmd[*]}${RESET}"
         echo -e "${CYAN}Command breakdown:${RESET}"
@@ -286,15 +316,25 @@ except Exception as e:
         else
             echo -e "${CYAN}- Montages: ${selected_montages[*]}${RESET}"
         fi
+        echo
+        echo -e "${YELLOW}Copyable command (for manual execution):${RESET}"
+        if [ -n "$env_vars" ]; then
+            echo -e "${BOLD_CYAN}${env_vars}$copyable_cmd${RESET}"
+        else
+            echo -e "${BOLD_CYAN}$copyable_cmd${RESET}"
+        fi
+        echo
         
         # Execute simulation with subject-specific variables
         "${cmd[@]}"
         
         # Check execution status
-        if [ $? -eq 0 ]; then
+        local exit_status=$?
+        if [ $exit_status -eq 0 ]; then
             echo -e "${GREEN}Simulation completed successfully for subject: $subject_id${RESET}"
         else
             echo -e "${RED}Simulation failed for subject: $subject_id${RESET}"
+            echo -e "${YELLOW}You can manually run the command above to debug.${RESET}"
         fi
         
         # Clean up subject-specific temp file after this subject's simulation
@@ -1606,9 +1646,18 @@ except Exception as e:
                         # Set environment variable for this specific simulation
                         export FLEX_MONTAGES_FILE="$file_path"
                         
+                        # Build command array
+                        local flex_cmd=("$simulator_dir/$main_script" "$subject_id" "$conductivity" "$project_dir" "$simulation_dir" "$sim_mode" "$current" "$electrode_shape" "$dimensions" "$thickness" "flex_mode" "$montage_name" "--")
+                        
+                        # Format and print copyable command
+                        local flex_copyable_cmd=$(format_command_line "${flex_cmd[@]}")
+                        echo -e "${GREEN}Executing: ${flex_cmd[*]}${RESET}"
+                        echo -e "${YELLOW}Copyable command (for manual execution):${RESET}"
+                        echo -e "${BOLD_CYAN}FLEX_MONTAGES_FILE=\"$file_path\" $flex_copyable_cmd${RESET}"
+                        echo
+                        
                         # Run the simulation for this individual montage
-                        echo "Executing: $simulator_dir/$main_script $subject_id $conductivity $project_dir $simulation_dir $sim_mode $current $electrode_shape $dimensions $thickness flex_mode $montage_name --"
-        "$simulator_dir/$main_script" "$subject_id" "$conductivity" "$project_dir" "$simulation_dir" "$sim_mode" "$current" "$electrode_shape" "$dimensions" "$thickness" "flex_mode" "$montage_name" --
+                        "${flex_cmd[@]}"
                         
                         # Clean up this specific temp file after simulation
                         if [[ -f "$file_path" ]]; then
@@ -1648,8 +1697,18 @@ except Exception as e:
                     if [[ -f "$file_path" ]]; then
                         echo "Processing individual free-hand simulation: $subject_id - $montage_name"
                         export FREEHAND_MONTAGES_FILE="$file_path"
-                        echo "Executing: $simulator_dir/$main_script $subject_id $conductivity $project_dir $simulation_dir $sim_mode $current $electrode_shape $dimensions $thickness freehand $montage_name --"
-                        "$simulator_dir/$main_script" "$subject_id" "$conductivity" "$project_dir" "$simulation_dir" "$sim_mode" "$current" "$electrode_shape" "$dimensions" "$thickness" "freehand" "$montage_name" --
+                        
+                        # Build command array
+                        local freehand_cmd=("$simulator_dir/$main_script" "$subject_id" "$conductivity" "$project_dir" "$simulation_dir" "$sim_mode" "$current" "$electrode_shape" "$dimensions" "$thickness" "freehand" "$montage_name" "--")
+                        
+                        # Format and print copyable command
+                        local freehand_copyable_cmd=$(format_command_line "${freehand_cmd[@]}")
+                        echo -e "${GREEN}Executing: ${freehand_cmd[*]}${RESET}"
+                        echo -e "${YELLOW}Copyable command (for manual execution):${RESET}"
+                        echo -e "${BOLD_CYAN}FREEHAND_MONTAGES_FILE=\"$file_path\" $freehand_copyable_cmd${RESET}"
+                        echo
+                        
+                        "${freehand_cmd[@]}"
                         if [[ -f "$file_path" ]]; then
                             rm -f "$file_path"
                             echo "Cleaned up free-hand temp file for $subject_id-$montage_name: $file_path"
@@ -1670,8 +1729,6 @@ except Exception as e:
         echo "Debug: Selected montages array: ${selected_montages[@]}"
         echo "Debug: Number of montages: ${#selected_montages[@]}"
         
-        echo "Executing: $simulator_dir/$main_script $subject_id $conductivity $project_dir $simulation_dir $sim_mode $current $electrode_shape $dimensions $thickness $eeg_net ${selected_montages[@]} --"
-        
         echo -e "${CYAN}=== PIPELINE DEBUG INFORMATION ===${RESET}"
         echo -e "${CYAN}Script being called: $simulator_dir/$main_script${RESET}"
         echo -e "${CYAN}Simulation framework: $simulation_framework${RESET}"
@@ -1680,17 +1737,49 @@ except Exception as e:
         echo -e "${CYAN}Script permissions: $(test -x "$simulator_dir/$main_script" && echo "EXECUTABLE" || echo "NOT EXECUTABLE")${RESET}"
         echo -e "${CYAN}===========================================${RESET}"
         
+        # Build command array based on simulation framework
+        local direct_cmd=("$simulator_dir/$main_script" "$subject_id" "$conductivity" "$project_dir" "$simulation_dir" "$sim_mode" "$current" "$electrode_shape" "$dimensions" "$thickness" "$eeg_net")
+        
+        # Add montages for regular mode
+        if [[ "$simulation_framework" != "flex" ]]; then
+            for montage in "${selected_montages[@]}"; do
+                direct_cmd+=("$montage")
+            done
+        fi
+        direct_cmd+=("--")
+        
+        # Format and print copyable command
+        local direct_copyable_cmd=$(format_command_line "${direct_cmd[@]}")
+        local direct_env_vars=""
+        
+        # Build environment variables string if needed
+        if [[ "$simulation_framework" == "flex" ]] && [[ -n "$FLEX_MONTAGES_FILE" ]]; then
+            direct_env_vars="FLEX_MONTAGES_FILE=\"$FLEX_MONTAGES_FILE\" "
+        fi
+        if [[ -n "$CONFIG_DIR" ]]; then
+            direct_env_vars+="CONFIG_DIR=\"$CONFIG_DIR\" "
+        fi
+        
+        echo -e "${GREEN}Executing: ${direct_cmd[*]}${RESET}"
+        echo -e "${YELLOW}Copyable command (for manual execution):${RESET}"
+        if [ -n "$direct_env_vars" ]; then
+            echo -e "${BOLD_CYAN}${direct_env_vars}$direct_copyable_cmd${RESET}"
+        else
+            echo -e "${BOLD_CYAN}$direct_copyable_cmd${RESET}"
+        fi
+        echo
+        
         # Call the appropriate main pipeline script
         if [[ "$simulation_framework" == "flex" ]]; then
             # For flex-search, pass empty montages array and rely on FLEX_MONTAGES_FILE
             echo -e "${CYAN}[DEBUG] Running flex simulation with script: $main_script${RESET}"
-            "$simulator_dir/$main_script" "$subject_id" "$conductivity" "$project_dir" "$simulation_dir" "$sim_mode" "$current" "$electrode_shape" "$dimensions" "$thickness" "$eeg_net" --
         else
             # For regular montages, pass the selected montages
             echo -e "${CYAN}[DEBUG] Running montage simulation with script: $main_script${RESET}"
             echo -e "${CYAN}[DEBUG] Montages to process: ${selected_montages[*]}${RESET}"
-            "$simulator_dir/$main_script" "$subject_id" "$conductivity" "$project_dir" "$simulation_dir" "$sim_mode" "$current" "$electrode_shape" "$dimensions" "$thickness" "$eeg_net" "${selected_montages[@]}" --
         fi
+        
+        "${direct_cmd[@]}"
         
         # Check exit status
         exit_status=$?
@@ -1698,6 +1787,7 @@ except Exception as e:
             echo -e "${GREEN}[DEBUG] Script $main_script completed successfully for subject $subject_id${RESET}"
         else
             echo -e "${RED}[DEBUG] Script $main_script failed with exit status $exit_status for subject $subject_id${RESET}"
+            echo -e "${YELLOW}You can manually run the command above to debug.${RESET}"
         fi
         
         # Clean up subject-specific temp file after this subject's simulation

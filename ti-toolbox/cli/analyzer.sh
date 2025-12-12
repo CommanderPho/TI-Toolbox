@@ -1236,6 +1236,26 @@ show_confirmation_dialog() {
     fi
 }
 
+# Function to format command array as copyable command line
+format_command_line() {
+    local cmd_array=("$@")
+    local cmd_line=""
+    local first=true
+    
+    for arg in "${cmd_array[@]}"; do
+        if [ "$first" = true ]; then
+            first=false
+        else
+            cmd_line+=" "
+        fi
+        
+        # Use printf %q for proper shell escaping
+        cmd_line+="$(printf '%q' "$arg")"
+    done
+    
+    echo "$cmd_line"
+}
+
 # Function to run the analysis
 run_analysis() {
     # Build the command to run main_analyzer.py
@@ -1280,9 +1300,17 @@ run_analysis() {
     export PROJECT_DIR="$project_dir"
     export SUBJECT_ID="$subject_id"
     
-    # Print the command being executed
+    # Format and print the copyable command
+    local copyable_cmd=$(format_command_line "${cmd[@]}")
     echo -e "${CYAN}Executing command:${RESET}"
     echo -e "${BOLD_CYAN}${cmd[*]}${RESET}"
+    echo
+    echo -e "${YELLOW}Copyable command (for manual execution):${RESET}"
+    if [ -n "$PROJECT_DIR" ] || [ -n "$SUBJECT_ID" ]; then
+        echo -e "${BOLD_CYAN}PROJECT_DIR=\"$project_dir\" SUBJECT_ID=\"$subject_id\" $copyable_cmd${RESET}"
+    else
+        echo -e "${BOLD_CYAN}$copyable_cmd${RESET}"
+    fi
     echo
     
     # Run the analysis
@@ -1291,6 +1319,7 @@ run_analysis() {
         echo -e "${GREEN}Analysis completed successfully.${RESET}"
     else
         echo -e "${RED}Analysis failed.${RESET}"
+        echo -e "${YELLOW}You can manually run the command above to debug.${RESET}"
         exit 1
     fi
 }
