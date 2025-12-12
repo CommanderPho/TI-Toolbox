@@ -6,6 +6,7 @@ Settings Menu - Gear icon menu for Help, Acknowledgments, and Contact
 """
 
 from PyQt5 import QtWidgets, QtCore, QtGui
+from PyQt5.QtCore import QSettings
 
 
 class FloatingHelpWindow(QtWidgets.QDialog):
@@ -135,6 +136,11 @@ class SettingsMenuButton(QtWidgets.QPushButton):
         self.menu = QtWidgets.QMenu(self)
         
         # Add menu actions
+        preferences_action = self.menu.addAction("Preferences")
+        preferences_action.triggered.connect(self.open_preferences)
+        
+        self.menu.addSeparator()
+        
         help_action = self.menu.addAction("Help")
         help_action.triggered.connect(self.open_help)
         
@@ -167,6 +173,114 @@ class SettingsMenuButton(QtWidgets.QPushButton):
         """Open the Acknowledgments window."""
         acknowledgments_window = FloatingAcknowledgmentsWindow(self.parent)
         acknowledgments_window.show()
+    
+    def open_preferences(self):
+        """Open the Preferences window."""
+        preferences_window = FloatingPreferencesWindow(self.parent)
+        preferences_window.show()
+
+
+class FloatingPreferencesWindow(QtWidgets.QDialog):
+    """Floating window for Preferences."""
+    
+    def __init__(self, parent=None):
+        super(FloatingPreferencesWindow, self).__init__(parent)
+        self.setWindowTitle("TI-Toolbox - Preferences")
+        self.setMinimumSize(500, 300)
+        self.settings = QSettings("TI-Toolbox", "TI-Toolbox")
+        self.setup_ui()
+        self.load_settings()
+        
+    def setup_ui(self):
+        """Set up the preferences window UI."""
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(15)
+        
+        # Title
+        title_label = QtWidgets.QLabel("Preferences")
+        title_label.setStyleSheet("font-size: 18px; font-weight: bold;")
+        layout.addWidget(title_label)
+        
+        # System Monitor section
+        monitor_group = QtWidgets.QGroupBox("System Monitor")
+        monitor_group.setStyleSheet("""
+            QGroupBox {
+                font-weight: bold;
+                border: 1px solid #cccccc;
+                border-radius: 5px;
+                margin-top: 10px;
+                padding-top: 10px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px;
+            }
+        """)
+        monitor_layout = QtWidgets.QVBoxLayout(monitor_group)
+        monitor_layout.setSpacing(10)
+        
+        # Command history logging option
+        self.command_history_cb = QtWidgets.QCheckBox("Enable command history logging")
+        self.command_history_cb.setToolTip(
+            "When enabled, logs all toolbox-related process commands to command_history.log in the project directory"
+        )
+        monitor_layout.addWidget(self.command_history_cb)
+        
+        # Description
+        desc_label = QtWidgets.QLabel(
+            "Command history logging records when toolbox processes start, including timestamp and full command line."
+        )
+        desc_label.setWordWrap(True)
+        desc_label.setStyleSheet("color: #666666; font-size: 10px;")
+        monitor_layout.addWidget(desc_label)
+        
+        layout.addWidget(monitor_group)
+        
+        layout.addStretch()
+        
+        # Buttons
+        button_layout = QtWidgets.QHBoxLayout()
+        button_layout.addStretch()
+        
+        self.apply_btn = QtWidgets.QPushButton("Apply")
+        self.apply_btn.clicked.connect(self.apply_settings)
+        self.apply_btn.setMinimumWidth(100)
+        button_layout.addWidget(self.apply_btn)
+        
+        self.ok_btn = QtWidgets.QPushButton("OK")
+        self.ok_btn.clicked.connect(self.ok_clicked)
+        self.ok_btn.setMinimumWidth(100)
+        button_layout.addWidget(self.ok_btn)
+        
+        self.cancel_btn = QtWidgets.QPushButton("Cancel")
+        self.cancel_btn.clicked.connect(self.close)
+        self.cancel_btn.setMinimumWidth(100)
+        button_layout.addWidget(self.cancel_btn)
+        
+        layout.addLayout(button_layout)
+    
+    def load_settings(self):
+        """Load settings from QSettings."""
+        # Default to True (enabled) if not set
+        command_history_enabled = self.settings.value("system_monitor/command_history_enabled", True, type=bool)
+        self.command_history_cb.setChecked(command_history_enabled)
+    
+    def save_settings(self):
+        """Save settings to QSettings."""
+        self.settings.setValue("system_monitor/command_history_enabled", self.command_history_cb.isChecked())
+        self.settings.sync()
+    
+    def apply_settings(self):
+        """Apply settings without closing the dialog."""
+        self.save_settings()
+        QtWidgets.QMessageBox.information(self, "Preferences", "Settings have been saved.")
+    
+    def ok_clicked(self):
+        """Save settings and close the dialog."""
+        self.save_settings()
+        self.close()
 
 
 class ExtensionsButton(QtWidgets.QPushButton):

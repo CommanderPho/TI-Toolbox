@@ -18,7 +18,7 @@ from collections import deque
 from pathlib import Path
 
 from PyQt5 import QtWidgets, QtCore, QtGui
-from PyQt5.QtCore import QTimer, QThread, pyqtSignal
+from PyQt5.QtCore import QTimer, QThread, pyqtSignal, QSettings
 from PyQt5.QtWidgets import QHeaderView
 
 try:
@@ -50,6 +50,9 @@ class ProcessMonitorThread(QThread):
         
         # Track seen processes to detect new ones
         self.seen_pids = set()
+        
+        # Initialize settings
+        self.settings = QSettings("TI-Toolbox", "TI-Toolbox")
         
         # Initialize command history log file
         self.command_history_file = self._get_command_history_path()
@@ -107,8 +110,17 @@ class ProcessMonitorThread(QThread):
         # Fallback to current working directory
         return os.path.join(os.getcwd(), 'command_history.log')
     
+    def _is_command_history_enabled(self):
+        """Check if command history logging is enabled in settings."""
+        # Default to True (enabled) if not set
+        return self.settings.value("system_monitor/command_history_enabled", True, type=bool)
+    
     def _log_command_start(self, pid, cmdline, create_time):
         """Log a command start to the command history file."""
+        # Check if logging is enabled
+        if not self._is_command_history_enabled():
+            return
+        
         try:
             # Format timestamp
             timestamp = datetime.fromtimestamp(create_time).strftime("%Y-%m-%d %H:%M:%S")
