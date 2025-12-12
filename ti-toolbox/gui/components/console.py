@@ -223,6 +223,8 @@ class ConsoleWidget(QtWidgets.QWidget):
         # Only auto-scroll if user was already at the bottom
         if at_bottom:
             self.console.ensureCursorVisible()
+            # Scroll to the very bottom to show latest output
+            QtCore.QTimer.singleShot(0, lambda: scrollbar.setValue(scrollbar.maximum()))
     
     def append_html(self, html_text):
         """
@@ -238,6 +240,8 @@ class ConsoleWidget(QtWidgets.QWidget):
         
         if at_bottom:
             self.console.ensureCursorVisible()
+            # Scroll to the very bottom to show latest output
+            QtCore.QTimer.singleShot(0, lambda: scrollbar.setValue(scrollbar.maximum()))
         
         QtWidgets.QApplication.processEvents()
     

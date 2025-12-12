@@ -1876,6 +1876,8 @@ class ExSearchTab(QtWidgets.QWidget):
             self.console_output.append(formatted_text)
             if at_bottom:
                 self.console_output.ensureCursorVisible()
+                # Scroll to the very bottom to show latest output
+                QtCore.QTimer.singleShot(0, lambda: scrollbar.setValue(scrollbar.maximum()))
             QtWidgets.QApplication.processEvents()
             return
             
@@ -1912,6 +1914,8 @@ class ExSearchTab(QtWidgets.QWidget):
         # Only auto-scroll if user was already at the bottom
         if at_bottom:
             self.console_output.ensureCursorVisible()
+            # Scroll to the very bottom to show latest output
+            QtCore.QTimer.singleShot(0, lambda: scrollbar.setValue(scrollbar.maximum()))
         
         QtWidgets.QApplication.processEvents()
 

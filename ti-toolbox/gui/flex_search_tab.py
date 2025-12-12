@@ -1567,6 +1567,8 @@ class FlexSearchTab(QtWidgets.QWidget):
             self.output_text.append(formatted_text)
             if at_bottom:
                 self.output_text.ensureCursorVisible()
+                # Scroll to the very bottom to show latest output
+                QtCore.QTimer.singleShot(0, lambda: scrollbar.setValue(scrollbar.maximum()))
             QtWidgets.QApplication.processEvents()
             return
             
@@ -1629,6 +1631,8 @@ class FlexSearchTab(QtWidgets.QWidget):
         # Only auto-scroll if user was already at the bottom
         if at_bottom:
             self.output_text.ensureCursorVisible()
+            # Scroll to the very bottom to show latest output
+            QtCore.QTimer.singleShot(0, lambda: scrollbar.setValue(scrollbar.maximum()))
         
         QtWidgets.QApplication.processEvents()
 

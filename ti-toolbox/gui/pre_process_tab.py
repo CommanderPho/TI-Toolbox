@@ -953,6 +953,8 @@ class PreProcessTab(QtWidgets.QWidget):
             self.output_text.append(formatted_text)
             if at_bottom:
                 self.output_text.ensureCursorVisible()
+                # Scroll to the very bottom to show latest output
+                QtCore.QTimer.singleShot(0, lambda: scrollbar.setValue(scrollbar.maximum()))
             self._last_plain_output_line = text
             QtWidgets.QApplication.processEvents()
             return
@@ -990,6 +992,8 @@ class PreProcessTab(QtWidgets.QWidget):
         # Only auto-scroll if user was already at the bottom
         if at_bottom:
             self.output_text.ensureCursorVisible()
+            # Scroll to the very bottom to show latest output
+            QtCore.QTimer.singleShot(0, lambda: scrollbar.setValue(scrollbar.maximum()))
         
         QtWidgets.QApplication.processEvents()
 

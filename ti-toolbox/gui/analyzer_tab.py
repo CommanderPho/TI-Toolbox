@@ -1906,7 +1906,8 @@ class AnalyzerTab(QtWidgets.QWidget):
                 self._summary_printed.add('final')
             if at_bottom:
                 self.output_console.ensureCursorVisible()
-                scrollbar.setValue(scrollbar.maximum())
+                # Scroll to the very bottom to show latest output
+                QtCore.QTimer.singleShot(0, lambda: scrollbar.setValue(scrollbar.maximum()))
             return
         
         # Format the output based on message type from thread
@@ -1958,7 +1959,7 @@ class AnalyzerTab(QtWidgets.QWidget):
         if at_bottom:
             self.output_console.ensureCursorVisible()
             # Scroll to the very bottom to show latest output
-            scrollbar.setValue(scrollbar.maximum())
+            QtCore.QTimer.singleShot(0, lambda: scrollbar.setValue(scrollbar.maximum()))
         
         # Avoid calling processEvents() here to prevent re-entrant recursion when many
         # queued output signals arrive rapidly.
