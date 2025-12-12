@@ -15,10 +15,19 @@ import time
 import threading
 from datetime import datetime
 from collections import deque
+from pathlib import Path
 
 from PyQt5 import QtWidgets, QtCore, QtGui
 from PyQt5.QtCore import QTimer, QThread, pyqtSignal
 from PyQt5.QtWidgets import QHeaderView
+
+try:
+    from core import get_path_manager
+except ImportError:
+    try:
+        from ti_toolbox.core.paths import get_path_manager
+    except ImportError:
+        get_path_manager = None
 
 import matplotlib
 matplotlib.use('Qt5Agg')
@@ -38,6 +47,12 @@ class ProcessMonitorThread(QThread):
         super().__init__()
         self.running = True
         self.update_interval = 2.0  # Update every 2 seconds
+        
+        # Track seen processes to detect new ones
+        self.seen_pids = set()
+        
+        # Initialize command history log file
+        self.command_history_file = self._get_command_history_path()
         
         # Keywords to identify toolbox-related processes
         self.relevant_keywords = [
@@ -78,9 +93,42 @@ class ProcessMonitorThread(QThread):
                 print(f"Error in process monitoring: {e}")
                 time.sleep(self.update_interval)
     
+    def _get_command_history_path(self):
+        """Get the path to the command history log file."""
+        try:
+            if get_path_manager:
+                pm = get_path_manager()
+                project_dir = pm.get_project_dir()
+                if project_dir:
+                    return os.path.join(project_dir, 'command_history.log')
+        except Exception:
+            pass
+        
+        # Fallback to current working directory
+        return os.path.join(os.getcwd(), 'command_history.log')
+    
+    def _log_command_start(self, pid, cmdline, create_time):
+        """Log a command start to the command history file."""
+        try:
+            # Format timestamp
+            timestamp = datetime.fromtimestamp(create_time).strftime("%Y-%m-%d %H:%M:%S")
+            
+            # Ensure directory exists
+            log_dir = os.path.dirname(self.command_history_file)
+            if log_dir and not os.path.exists(log_dir):
+                os.makedirs(log_dir, exist_ok=True)
+            
+            # Append to log file
+            with open(self.command_history_file, 'a', encoding='utf-8') as f:
+                f.write(f"{timestamp} | PID: {pid} | {cmdline}\n")
+        except Exception as e:
+            # Silently fail to avoid disrupting monitoring
+            pass
+    
     def get_relevant_processes(self):
         """Get processes relevant to the toolbox using psutil."""
         relevant_processes = []
+        current_pids = set()
         
         try:
             for proc in psutil.process_iter(['pid', 'name', 'cmdline', 'cpu_percent', 'memory_percent', 'create_time', 'status']):
@@ -88,9 +136,18 @@ class ProcessMonitorThread(QThread):
                     proc_info = proc.info
                     cmdline = ' '.join(proc_info['cmdline']) if proc_info['cmdline'] else ''
                     proc_name = proc_info['name'] or ''
+                    pid = proc_info['pid']
                     
                     # Check if process is relevant
                     if self.is_relevant_process(proc_name, cmdline):
+                        current_pids.add(pid)
+                        
+                        # Check if this is a new process
+                        if pid not in self.seen_pids:
+                            # Log new process start
+                            self._log_command_start(pid, cmdline, proc_info['create_time'])
+                            self.seen_pids.add(pid)
+                        
                         # Calculate runtime
                         runtime = time.time() - proc_info['create_time']
                         runtime_str = self.format_runtime(runtime)
@@ -104,9 +161,9 @@ class ProcessMonitorThread(QThread):
                             pass
                         
                         process_data = {
-                            'pid': proc_info['pid'],
+                            'pid': pid,
                             'name': proc_name,
-                            'cmdline': cmdline[:100] + '...' if len(cmdline) > 100 else cmdline,  # Truncate long commands
+                            'cmdline': cmdline,  # Store full command
                             'cpu_percent': proc_info['cpu_percent'] or 0,
                             'memory_percent': proc_info['memory_percent'] or 0,
                             'memory_mb': memory_mb,
@@ -117,6 +174,9 @@ class ProcessMonitorThread(QThread):
                         
                 except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
                     continue
+            
+            # Remove PIDs that are no longer running (cleanup)
+            self.seen_pids &= current_pids
                     
         except Exception as e:
             print(f"Error getting process list: {e}")
@@ -148,7 +208,7 @@ class ProcessMonitorThread(QThread):
                                 process_data = {
                                     'pid': int(pid),
                                     'name': command.split()[0] if command else 'unknown',
-                                    'cmdline': command[:100] + '...' if len(command) > 100 else command,
+                                    'cmdline': command,  # Store full command
                                     'cpu_percent': float(cpu) if cpu.replace('.', '').isdigit() else 0,
                                     'memory_percent': float(mem) if mem.replace('.', '').isdigit() else 0,
                                     'memory_mb': 0,
@@ -496,8 +556,10 @@ class SystemMonitorTab(QtWidgets.QWidget):
             # Process Name
             self.process_table.setItem(row, 1, QtWidgets.QTableWidgetItem(proc['name']))
             
-            # Command
-            self.process_table.setItem(row, 2, QtWidgets.QTableWidgetItem(proc['cmdline']))
+            # Command - store full command and add tooltip
+            cmd_item = QtWidgets.QTableWidgetItem(proc['cmdline'])
+            cmd_item.setToolTip(proc['cmdline'])  # Show full command on hover
+            self.process_table.setItem(row, 2, cmd_item)
             
             # CPU %
             cpu_item = QtWidgets.QTableWidgetItem(f"{proc['cpu_percent']:.1f}%")
