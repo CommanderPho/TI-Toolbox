@@ -37,6 +37,26 @@ MAGENTA='\033[0;35m'
 BOLD_BLUE='\033[1;34m'
 BG_BLUE='\033[44m'
 
+# Function to format command array as copyable command line
+format_command_line() {
+    local cmd_array=("$@")
+    local cmd_line=""
+    local first=true
+    
+    for arg in "${cmd_array[@]}"; do
+        if [ "$first" = true ]; then
+            first=false
+        else
+            cmd_line+=" "
+        fi
+        
+        # Use printf %q for proper shell escaping
+        cmd_line+="$(printf '%q' "$arg")"
+    done
+    
+    echo "$cmd_line"
+}
+
 # Function to read configuration
 read_config() {
     local key=$1
@@ -1214,55 +1234,112 @@ for subject_id in "${selected_subjects[@]}"; do
     # Export subject ID for logging and other utilities
     export SUBJECT_ID="$subject_id"
     
-    # Build the command with all required arguments
-    cmd="simnibs_python -m opt.flex"
-    cmd+=" --subject \"$subject_id\""
-    cmd+=" --goal \"$goal\""
-    cmd+=" --postproc \"$postproc\""
-    cmd+=" --eeg-net \"$eeg_net\""
-    cmd+=" --radius \"$radius\""
-    cmd+=" --current \"$current\""
-    cmd+=" --roi-method \"$ROI_METHOD\""
+    # Build the command as an array with all required arguments
+    local cmd_array=(simnibs_python -m opt.flex)
+    cmd_array+=(--subject "$subject_id")
+    cmd_array+=(--goal "$goal")
+    cmd_array+=(--postproc "$postproc")
+    cmd_array+=(--eeg-net "$eeg_net")
+    cmd_array+=(--radius "$radius")
+    cmd_array+=(--current "$current")
+    cmd_array+=(--roi-method "$ROI_METHOD")
     
     # Add optimization parameters
-    cmd+=" --n-multistart \"$n_multistart\""
-    cmd+=" --max-iterations \"$max_iterations\""
-    cmd+=" --population-size \"$population_size\""
-    cmd+=" --cpus \"$cpus\""
+    cmd_array+=(--n-multistart "$n_multistart")
+    cmd_array+=(--max-iterations "$max_iterations")
+    cmd_array+=(--population-size "$population_size")
+    cmd_array+=(--cpus "$cpus")
     
     # Add mapping options
     if [ "$enable_mapping" = "true" ]; then
-        cmd+=" --enable-mapping"
+        cmd_array+=(--enable-mapping)
         if [ "$run_mapped_simulation" = "false" ]; then
-            cmd+=" --disable-mapping-simulation"
+            cmd_array+=(--disable-mapping-simulation)
         fi
     fi
     
     # Add quiet mode
     if [ "$quiet_mode" = "true" ]; then
-        cmd+=" --quiet"
+        cmd_array+=(--quiet)
     fi
     
     # Add final electrode simulation option
     if [ "$run_final_electrode_simulation" = "false" ]; then
-        cmd+=" --skip-final-electrode-simulation"
+        cmd_array+=(--skip-final-electrode-simulation)
     fi
     
     # Add non-ROI arguments if goal is focality
     if [ "$goal" = "focality" ] && [ -n "$non_roi_method" ]; then
-        cmd+=" --non-roi-method \"$non_roi_method\""
+        cmd_array+=(--non-roi-method "$non_roi_method")
         if [ -n "$THRESHOLD_VALUES" ]; then
-            cmd+=" --thresholds \"$THRESHOLD_VALUES\""
+            cmd_array+=(--thresholds "$THRESHOLD_VALUES")
         fi
     fi
     
-    # Execute the command
+    # Add ROI-specific arguments based on ROI_METHOD
+    if [ "$ROI_METHOD" = "spherical" ]; then
+        cmd_array+=(--roi-x "$ROI_X")
+        cmd_array+=(--roi-y "$ROI_Y")
+        cmd_array+=(--roi-z "$ROI_Z")
+        cmd_array+=(--roi-radius "$ROI_RADIUS")
+        if [ "$USE_MNI_COORDS" = "true" ]; then
+            cmd_array+=(--use-mni-coords)
+        fi
+    elif [ "$ROI_METHOD" = "atlas" ]; then
+        cmd_array+=(--atlas-path "$ATLAS_PATH")
+        cmd_array+=(--roi-label "$ROI_LABEL")
+        if [ -n "$SELECTED_HEMISPHERE" ]; then
+            cmd_array+=(--hemisphere "$SELECTED_HEMISPHERE")
+        fi
+    fi
+    
+    # Add non-ROI arguments for focality if specific non-ROI is defined
+    if [ "$goal" = "focality" ] && [ "$non_roi_method" = "specific" ]; then
+        if [ "$ROI_METHOD" = "spherical" ]; then
+            cmd_array+=(--non-roi-x "$NON_ROI_X")
+            cmd_array+=(--non-roi-y "$NON_ROI_Y")
+            cmd_array+=(--non-roi-z "$NON_ROI_Z")
+            cmd_array+=(--non-roi-radius "$NON_ROI_RADIUS")
+            if [ "$USE_MNI_COORDS_NON_ROI" = "true" ]; then
+                cmd_array+=(--use-mni-coords-non-roi)
+            fi
+        elif [ "$ROI_METHOD" = "atlas" ] && [ -n "$NON_ROI_ATLAS_PATH" ]; then
+            cmd_array+=(--non-roi-atlas-path "$NON_ROI_ATLAS_PATH")
+            cmd_array+=(--non-roi-label "$NON_ROI_LABEL")
+            if [ -n "$NON_ROI_HEMISPHERE" ]; then
+                cmd_array+=(--non-roi-hemisphere "$NON_ROI_HEMISPHERE")
+            fi
+        fi
+    fi
+    
+    # Format and print the copyable command
+    local copyable_cmd=$(format_command_line "${cmd_array[@]}")
+    local env_vars=""
+    
+    # Build environment variables string
+    if [ -n "$PROJECT_DIR" ]; then
+        env_vars="PROJECT_DIR=\"$PROJECT_DIR\" "
+    fi
+    if [ -n "$SUBJECT_ID" ]; then
+        env_vars+="SUBJECT_ID=\"$SUBJECT_ID\" "
+    fi
+    
     echo -e "\n${CYAN}Executing optimization...${RESET}"
-    if eval "$cmd"; then
+    echo -e "${GREEN}Command: ${cmd_array[*]}${RESET}"
+    echo -e "${YELLOW}Copyable command (for manual execution):${RESET}"
+    if [ -n "$env_vars" ]; then
+        echo -e "${BOLD_CYAN}${env_vars}$copyable_cmd${RESET}"
+    else
+        echo -e "${BOLD_CYAN}$copyable_cmd${RESET}"
+    fi
+    echo
+    
+    # Execute the command
+    if "${cmd_array[@]}"; then
         print_success "Successfully completed flex-search for subject $subject_id"
     else
         print_error "Failed to complete flex-search for subject $subject_id"
-        echo -e "${YELLOW}Check the logs above for more details${RESET}"
+        echo -e "${YELLOW}You can manually run the command above to debug.${RESET}"
     fi
 done
 

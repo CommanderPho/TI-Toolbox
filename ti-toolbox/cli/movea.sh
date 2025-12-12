@@ -21,6 +21,26 @@ CYAN='\033[0;36m'
 BOLD_CYAN='\033[1;36m'
 YELLOW='\033[0;33m'
 
+# Function to format command array as copyable command line
+format_command_line() {
+    local cmd_array=("$@")
+    local cmd_line=""
+    local first=true
+    
+    for arg in "${cmd_array[@]}"; do
+        if [ "$first" = true ]; then
+            first=false
+        else
+            cmd_line+=" "
+        fi
+        
+        # Use printf %q for proper shell escaping
+        cmd_line+="$(printf '%q' "$arg")"
+    done
+    
+    echo "$cmd_line"
+}
+
 # Default values
 GENERATIONS=50
 POPULATION=30
@@ -316,9 +336,38 @@ export CURRENT
 export ROI_RADIUS
 export NUM_ELECTRODES
 
+# Build command array
+cmd_array=(simnibs_python "$PYTHON_SCRIPT")
+
+# Format and print the copyable command
+copyable_cmd=$(format_command_line "${cmd_array[@]}")
+env_vars=""
+
+# Build environment variables string
+env_vars="SUBJECT_DIR=\"$SUBJECT_DIR\" "
+env_vars+="TARGET=\"$TARGET\" "
+env_vars+="OUTPUT_DIR=\"$OUTPUT_DIR\" "
+env_vars+="GENERATIONS=\"$GENERATIONS\" "
+env_vars+="POPULATION=\"$POPULATION\" "
+env_vars+="CURRENT=\"$CURRENT\" "
+env_vars+="ROI_RADIUS=\"$ROI_RADIUS\" "
+env_vars+="NUM_ELECTRODES=\"$NUM_ELECTRODES\" "
+
+if [ -n "$LEADFIELD_FILE" ]; then
+    env_vars+="LEADFIELD_FILE=\"$LEADFIELD_FILE\" "
+fi
+if [ -n "$POSITIONS_FILE" ]; then
+    env_vars+="POSITIONS_FILE=\"$POSITIONS_FILE\" "
+fi
+
 # Run Python script
 echo -e "${CYAN}Starting optimization...${RESET}"
-simnibs_python "$PYTHON_SCRIPT"
+echo -e "${GREEN}Command: ${cmd_array[*]}${RESET}"
+echo -e "${YELLOW}Copyable command (for manual execution):${RESET}"
+echo -e "${BOLD_CYAN}${env_vars}$copyable_cmd${RESET}"
+echo
+
+"${cmd_array[@]}"
 
 exit_code=$?
 
@@ -329,6 +378,7 @@ if [ $exit_code -eq 0 ]; then
     echo -e "${GREEN}${BOLD}Optimization completed successfully!${RESET}"
 else
     echo -e "${RED}${BOLD}Optimization failed with exit code $exit_code${RESET}"
+    echo -e "${YELLOW}You can manually run the command above to debug.${RESET}"
 fi
 
 exit $exit_code
