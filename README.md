@@ -16,3 +16,14 @@ For inquiries regarding the TI-Toolbox, please contact:
 
 - **Ido Haber**
 - Email: ihaber@wisc.edu
+
+
+
+# Pho TODO for Dev
+
+# Workflow Summary
+What you want to do	Command
+Interactive development shell	./dev/bash_dev/loader_dev.sh
+Run unit tests	./tests/test.sh --unit-only
+Full test suite	./tests/test.sh --verbose
+Run the GUI app (normal mode)	Use the Desktop App or ./loader.sh

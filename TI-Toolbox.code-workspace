@@ -4,5 +4,10 @@
 			"path": "."
 		}
 	],
-	"settings": {}
+	"settings": {
+		"terminal.integrated.automationProfile.windows": {
+			"path": "C:\\Windows\\System32\\wsl.exe",
+			"args": ["-d", "Ubuntu"]
+		}
+	}
 }
