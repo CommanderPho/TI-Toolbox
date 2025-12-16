@@ -853,7 +853,7 @@ class VoxelVisualizer(Visualizer):
         output_filename = os.path.join(output_dir, f"{region_name}_ROI.nii.gz")
         
         # Save as NIfTI
-        import nibabel as nib
+        # import nibabel as nib
         vis_img = nib.Nifti1Image(vis_arr, atlas_img.affine)
         nib.save(vis_img, output_filename)
         
