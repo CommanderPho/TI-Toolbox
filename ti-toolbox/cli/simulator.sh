@@ -1647,10 +1647,10 @@ except Exception as e:
                         export FLEX_MONTAGES_FILE="$file_path"
                         
                         # Build command array
-                        local flex_cmd=("$simulator_dir/$main_script" "$subject_id" "$conductivity" "$project_dir" "$simulation_dir" "$sim_mode" "$current" "$electrode_shape" "$dimensions" "$thickness" "flex_mode" "$montage_name" "--")
+                        flex_cmd=("$simulator_dir/$main_script" "$subject_id" "$conductivity" "$project_dir" "$simulation_dir" "$sim_mode" "$current" "$electrode_shape" "$dimensions" "$thickness" "flex_mode" "$montage_name" "--")
                         
                         # Format and print copyable command
-                        local flex_copyable_cmd=$(format_command_line "${flex_cmd[@]}")
+                        flex_copyable_cmd=$(format_command_line "${flex_cmd[@]}")
                         echo -e "${GREEN}Executing: ${flex_cmd[*]}${RESET}"
                         echo -e "${YELLOW}Copyable command (for manual execution):${RESET}"
                         echo -e "${BOLD_CYAN}FLEX_MONTAGES_FILE=\"$file_path\" $flex_copyable_cmd${RESET}"
