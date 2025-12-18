@@ -1561,7 +1561,7 @@ if [[ "$1" == "--run-direct" ]]; then
     echo "Debug: SELECTED_MONTAGES env var: '$SELECTED_MONTAGES'"
     if [[ -n "$SELECTED_MONTAGES" ]]; then
         IFS=',' read -ra selected_montages <<< "$SELECTED_MONTAGES"
-        echo "Debug: Parsed selected_montages array: ${selected_montages[@]}"
+        echo "Debug: Parsed selected_montages array: ${selected_montages[*]}"
         echo "Debug: Number of parsed montages: ${#selected_montages[@]}"
     else
         selected_montages=()
@@ -1726,7 +1726,7 @@ except Exception as e:
         fi
         
         # Debug output for montages
-        echo "Debug: Selected montages array: ${selected_montages[@]}"
+        echo "Debug: Selected montages array: ${selected_montages[*]}"
         echo "Debug: Number of montages: ${#selected_montages[@]}"
         
         echo -e "${CYAN}=== PIPELINE DEBUG INFORMATION ===${RESET}"

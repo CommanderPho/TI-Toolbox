@@ -243,7 +243,14 @@ collect_simulation_info() {
         for sim_path in $voxel_dir; do
             if [ -d "$sim_path" ]; then
                 sim_name=$(basename "$(dirname "$(dirname "$sim_path")")")
-                if [[ ! " ${simulations[@]} " =~ " ${sim_name} " ]]; then
+                local found=false
+                for existing_sim in "${simulations[@]}"; do
+                    if [[ "$existing_sim" == "$sim_name" ]]; then
+                        found=true
+                        break
+                    fi
+                done
+                if [[ "$found" == "false" ]]; then
                     simulations+=("$sim_name")
                 fi
             fi
@@ -867,7 +874,14 @@ list_simulations() {
     for sim_path in $voxel_dir; do
         if [ -d "$sim_path" ]; then
             sim_name=$(basename "$(dirname "$(dirname "$sim_path")")")
-            if [[ ! " ${simulations[@]} " =~ " ${sim_name} " ]]; then
+            local found=false
+            for existing_sim in "${simulations[@]}"; do
+                if [[ "$existing_sim" == "$sim_name" ]]; then
+                    found=true
+                    break
+                fi
+            done
+            if [[ "$found" == "false" ]]; then
                 simulations+=("$sim_name")
             fi
         fi
