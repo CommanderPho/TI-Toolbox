@@ -1561,7 +1561,7 @@ if [[ "$1" == "--run-direct" ]]; then
     echo "Debug: SELECTED_MONTAGES env var: '$SELECTED_MONTAGES'"
     if [[ -n "$SELECTED_MONTAGES" ]]; then
         IFS=',' read -ra selected_montages <<< "$SELECTED_MONTAGES"
-        echo "Debug: Parsed selected_montages array: ${selected_montages[@]}"
+        echo "Debug: Parsed selected_montages array: ${selected_montages[*]}"
         echo "Debug: Number of parsed montages: ${#selected_montages[@]}"
     else
         selected_montages=()
@@ -1699,10 +1699,10 @@ except Exception as e:
                         export FREEHAND_MONTAGES_FILE="$file_path"
                         
                         # Build command array
-                        local freehand_cmd=("$simulator_dir/$main_script" "$subject_id" "$conductivity" "$project_dir" "$simulation_dir" "$sim_mode" "$current" "$electrode_shape" "$dimensions" "$thickness" "freehand" "$montage_name" "--")
+                        freehand_cmd=("$simulator_dir/$main_script" "$subject_id" "$conductivity" "$project_dir" "$simulation_dir" "$sim_mode" "$current" "$electrode_shape" "$dimensions" "$thickness" "freehand" "$montage_name" "--")
                         
                         # Format and print copyable command
-                        local freehand_copyable_cmd=$(format_command_line "${freehand_cmd[@]}")
+                        freehand_copyable_cmd=$(format_command_line "${freehand_cmd[@]}")
                         echo -e "${GREEN}Executing: ${freehand_cmd[*]}${RESET}"
                         echo -e "${YELLOW}Copyable command (for manual execution):${RESET}"
                         echo -e "${BOLD_CYAN}FREEHAND_MONTAGES_FILE=\"$file_path\" $freehand_copyable_cmd${RESET}"
@@ -1726,7 +1726,7 @@ except Exception as e:
         fi
         
         # Debug output for montages
-        echo "Debug: Selected montages array: ${selected_montages[@]}"
+        echo "Debug: Selected montages array: ${selected_montages[*]}"
         echo "Debug: Number of montages: ${#selected_montages[@]}"
         
         echo -e "${CYAN}=== PIPELINE DEBUG INFORMATION ===${RESET}"
@@ -1738,7 +1738,7 @@ except Exception as e:
         echo -e "${CYAN}===========================================${RESET}"
         
         # Build command array based on simulation framework
-        local direct_cmd=("$simulator_dir/$main_script" "$subject_id" "$conductivity" "$project_dir" "$simulation_dir" "$sim_mode" "$current" "$electrode_shape" "$dimensions" "$thickness" "$eeg_net")
+        direct_cmd=("$simulator_dir/$main_script" "$subject_id" "$conductivity" "$project_dir" "$simulation_dir" "$sim_mode" "$current" "$electrode_shape" "$dimensions" "$thickness" "$eeg_net")
         
         # Add montages for regular mode
         if [[ "$simulation_framework" != "flex" ]]; then
@@ -1749,8 +1749,8 @@ except Exception as e:
         direct_cmd+=("--")
         
         # Format and print copyable command
-        local direct_copyable_cmd=$(format_command_line "${direct_cmd[@]}")
-        local direct_env_vars=""
+        direct_copyable_cmd=$(format_command_line "${direct_cmd[@]}")
+        direct_env_vars=""
         
         # Build environment variables string if needed
         if [[ "$simulation_framework" == "flex" ]] && [[ -n "$FLEX_MONTAGES_FILE" ]]; then

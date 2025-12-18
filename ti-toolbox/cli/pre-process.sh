@@ -233,7 +233,14 @@ count=0
 for subj_dir in "$PROJECT_DIR/sourcedata/sub-"*; do
   if [ -d "$subj_dir" ]; then
     # Check for both BIDS structure and compressed format
-    if [ -d "$subj_dir/T1w" ] || [ -f "$subj_dir"/*.tgz ]; then
+    has_tgz=false
+    for tgz_file in "$subj_dir"/*.tgz; do
+      if [ -f "$tgz_file" ]; then
+        has_tgz=true
+        break
+      fi
+    done
+    if [ -d "$subj_dir/T1w" ] || [ "$has_tgz" = "true" ]; then
       subject_id=$(basename "$subj_dir" | sed 's/^sub-//')
       count=$((count+1))
       printf "%3d. %-15s " "$count" "$subject_id"

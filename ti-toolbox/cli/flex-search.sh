@@ -1235,7 +1235,7 @@ for subject_id in "${selected_subjects[@]}"; do
     export SUBJECT_ID="$subject_id"
     
     # Build the command as an array with all required arguments
-    local cmd_array=(simnibs_python -m opt.flex)
+    cmd_array=(simnibs_python -m opt.flex)
     cmd_array+=(--subject "$subject_id")
     cmd_array+=(--goal "$goal")
     cmd_array+=(--postproc "$postproc")
@@ -1313,8 +1313,8 @@ for subject_id in "${selected_subjects[@]}"; do
     fi
     
     # Format and print the copyable command
-    local copyable_cmd=$(format_command_line "${cmd_array[@]}")
-    local env_vars=""
+    copyable_cmd=$(format_command_line "${cmd_array[@]}")
+    env_vars=""
     
     # Build environment variables string
     if [ -n "$PROJECT_DIR" ]; then
