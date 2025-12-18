@@ -650,6 +650,41 @@ collect_cortical_params() {
         fi
         echo -e "${GREEN}✓ Atlas files validated for all subjects${RESET}"
     fi
+    # Collect coordinate space for cortical analysis
+    if ! is_prompt_enabled "coordinate_space"; then
+        local default_coord_space=$(get_default_value "coordinate_space")
+        if [ -n "$default_coord_space" ]; then
+            coordinate_space="$default_coord_space"
+            echo -e "${CYAN}Using default coordinate space: $coordinate_space${RESET}"
+        else
+            coordinate_space="subject"
+            echo -e "${CYAN}Using default coordinate space: subject${RESET}"
+        fi
+    else
+        echo -e "${GREEN}Select coordinate space for cortical analysis:${RESET}"
+        echo "1. MNI space"
+        echo "2. Subject space"
+        valid_choice=false
+        until $valid_choice; do
+            read -p "Enter choice (1-2): " coord_space_choice
+            case $coord_space_choice in
+                1)
+                    coordinate_space="MNI"
+                    valid_choice=true
+                    ;;
+                2)
+                    coordinate_space="subject"
+                    valid_choice=true
+                    ;;
+                *)
+                    echo -e "${RED}Invalid choice. Please enter 1 or 2.${RESET}"
+                    ;;
+            esac
+        done
+    fi
+
+    echo -e "${CYAN}Coordinate space: $coordinate_space${RESET}"
+
     # Always require a specific region (no prompt for whole head)
     while true; do
         echo -e "${GREEN}Region selection:${RESET}"
@@ -968,6 +1003,7 @@ show_confirmation_dialog() {
     if [ "$analysis_type" == "spherical" ]; then
         echo -e "\n${BOLD_CYAN}Spherical Analysis Parameters:${RESET}"
         echo -e "Coordinates: ${CYAN}(${coordinates[0]}, ${coordinates[1]}, ${coordinates[2]})${RESET}"
+        echo -e "Coordinate Space: ${CYAN}$coordinate_space${RESET}"
         echo -e "Radius: ${CYAN}$radius mm${RESET}"
     else
         echo -e "\n${BOLD_CYAN}Cortical Analysis Parameters:${RESET}"
@@ -976,6 +1012,7 @@ show_confirmation_dialog() {
         else
             echo -e "Atlas: ${CYAN}Subject-specific atlas files${RESET}"
         fi
+        echo -e "Coordinate Space: ${CYAN}$coordinate_space${RESET}"
         echo -e "Analysis Scope: ${CYAN}Region: $region_name${RESET}"
     fi
     
@@ -1016,6 +1053,7 @@ run_group_analysis() {
         fi
         
         cmd+=(--region "$region_name")
+        cmd+=(--coordinate-space "$coordinate_space")
     fi
     
     # Always enable visualizations
