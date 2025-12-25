@@ -125,9 +125,19 @@ class NiftiViewerTab(QtWidgets.QWidget):
                 for region_dir in os.listdir(voxel_dir):
                     region_path = os.path.join(voxel_dir, region_dir)
                     if os.path.isdir(region_path):
-                        # Look for NIfTI files directly in the region directory
+                        # Check for NIfTI files directly in the region directory (region-specific analyses)
                         if glob.glob(os.path.join(region_path, "*.nii*")):
                             regions.append(region_dir)
+                        else:
+                            # Check for subdirectories with NIfTI files (whole_head analyses)
+                            # This handles the case where whole_head analysis stores files in subdirectories
+                            for subdir in os.listdir(region_path):
+                                subdir_path = os.path.join(region_path, subdir)
+                                if os.path.isdir(subdir_path):
+                                    if glob.glob(os.path.join(subdir_path, "*.nii*")):
+                                        # Found subdirectories with NIfTI files, add parent directory
+                                        regions.append(region_dir)
+                                        break
         
         return sorted(regions)
         
@@ -987,15 +997,30 @@ class NiftiViewerTab(QtWidgets.QWidget):
             analysis_dir = os.path.join(sim_dir, "Analyses", "Voxel", region_name) if sim_dir else None
             
             if os.path.exists(analysis_dir):
-                # First try to find the specific ROI file
-                roi_file = os.path.join(analysis_dir, f"brain_with_{region_name}_ROI.nii.gz")
-                if not os.path.exists(roi_file):
-                    # If not found, take the first NIfTI file
-                    nifti_files = glob.glob(os.path.join(analysis_dir, "*.nii*"))
-                    if nifti_files:
-                        roi_file = nifti_files[0]
-                    else:
-                        roi_file = None
+                roi_file = None
+                
+                # Check if this is a whole_head analysis (files stored in subdirectories)
+                if region_name.startswith("whole_head_"):
+                    # Look for NIfTI files in subdirectories
+                    for subdir in os.listdir(analysis_dir):
+                        subdir_path = os.path.join(analysis_dir, subdir)
+                        if os.path.isdir(subdir_path):
+                            nifti_files = glob.glob(os.path.join(subdir_path, "*.nii*"))
+                            if nifti_files:
+                                # Use the first available NIfTI file from subdirectories
+                                roi_file = nifti_files[0]
+                                break
+                else:
+                    # Region-specific analysis: files directly in the analysis directory
+                    # First try to find the specific ROI file
+                    roi_file = os.path.join(analysis_dir, f"brain_with_{region_name}_ROI.nii.gz")
+                    if not os.path.exists(roi_file):
+                        # If not found, take the first NIfTI file
+                        nifti_files = glob.glob(os.path.join(analysis_dir, "*.nii*"))
+                        if nifti_files:
+                            roi_file = nifti_files[0]
+                        else:
+                            roi_file = None
                 
                 if roi_file and os.path.exists(roi_file):
                     analysis_visible = 1 if self.analysis_visibility_chk.isChecked() else 0
