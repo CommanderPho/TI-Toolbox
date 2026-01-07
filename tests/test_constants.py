@@ -10,9 +10,9 @@ import pytest
 import os
 import sys
 
-# Add ti-toolbox directory to path
+# Add tit directory to path
 project_root = os.path.join(os.path.dirname(__file__), '..')
-ti_toolbox_dir = os.path.join(project_root, 'ti-toolbox')
+ti_toolbox_dir = os.path.join(project_root, 'tit')
 sys.path.insert(0, ti_toolbox_dir)
 
 from core import constants as const
@@ -48,12 +48,12 @@ class TestDirectoryConstants:
         assert hasattr(const, 'DIR_ROIS')
         assert hasattr(const, 'DIR_ANALYSIS')
         assert hasattr(const, 'DIR_FLEX_SEARCH')
-        assert hasattr(const, 'DIR_MOVEA')
+        assert hasattr(const, 'DIR_EX_SEARCH')
 
         assert const.DIR_M2M_PREFIX == "m2m_"
         assert const.DIR_EEG_POSITIONS == "eeg_positions"
         assert const.DIR_ROIS == "ROIs"
-        assert const.DIR_ANALYSIS == "analysis"
+        assert const.DIR_ANALYSIS == "Analyses"
 
     def test_no_hardcoded_paths(self):
         """Test that directory constants don't contain absolute paths"""

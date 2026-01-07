@@ -10,20 +10,34 @@ permalink: /gallery/simulations/
   <h3>Temporal Interference Field Simulation</h3>
   <div class="gallery-grid">
     <div class="gallery-item">
-      <img src="{{ site.baseurl }}/assets/imgs/gallery/analyzer_MRI_ROI_field.png" alt="MRI ROI Field Analysis" onclick="openLightbox(this)" />
+      <img src="{{ site.baseurl }}/assets/imgs/visualizers/visualizer_MRI_ROI_field.png" alt="MRI ROI Field Analysis" onclick="openLightbox(this)" />
       <p>MRI-based region of interest analysis with temporal interference field distribution.</p>
     </div>
     <div class="gallery-item">
-      <img src="{{ site.baseurl }}/assets/imgs/gallery/analyzer_MRI_ROI.png" alt="MRI ROI Analysis" onclick="openLightbox(this)" />
+      <img src="{{ site.baseurl }}/assets/imgs/visualizers/visualizer_MRI_ROI.png" alt="MRI ROI Analysis" onclick="openLightbox(this)" />
       <p>Region of interest analysis showing precise targeting of brain structures.</p>
     </div>
     <div class="gallery-item">
-      <img src="{{ site.baseurl }}/assets/imgs/gallery/analyzer_MRI_atlas.png" alt="MRI Atlas" onclick="openLightbox(this)" />
+      <img src="{{ site.baseurl }}/assets/imgs/visualizers/visualizer_MRI_atlas.png" alt="MRI Atlas" onclick="openLightbox(this)" />
       <p>Brain atlas visualization with anatomical structures and regions clearly defined.</p>
     </div>
     <div class="gallery-item">
-      <img src="{{ site.baseurl }}/assets/imgs/gallery/analyzer_MRI_atlas_field.png" alt="Atlas with Field" onclick="openLightbox(this)" />
+      <img src="{{ site.baseurl }}/assets/imgs/visualizers/visualizer_MRI_atlas_field.png" alt="Atlas with Field" onclick="openLightbox(this)" />
       <p>Atlas overlay with electric field distribution for anatomical reference and targeting.</p>
+    </div>
+  </div>
+</div>
+
+<div class="gallery-section">
+  <h3>Anisotropic Tissue Modeling with DTI</h3>
+  <div class="gallery-grid">
+    <div class="gallery-item">
+      <img src="{{ site.baseurl }}/assets/imgs/simulator/dti_CC.png" alt="DTI Eigen Vectors - Corpus Callosum" onclick="openLightbox(this)" />
+      <p>Gmsh visualization of white and gray matter with eigen vectors in the corpus callosum region, showing organized fiber directions for anisotropic conductivity modeling.</p>
+    </div>
+    <div class="gallery-item">
+      <img src="{{ site.baseurl }}/assets/imgs/simulator/dti_spinal.png" alt="DTI Eigen Vectors - Spinal Cord" onclick="openLightbox(this)" />
+      <p>Spinal cord region showing longitudinal fiber orientation with overlaid eigen vectors that scale conductivity in anisotropic simulations.</p>
     </div>
   </div>
 </div>
@@ -52,7 +66,7 @@ permalink: /gallery/simulations/
 
 .gallery-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
   gap: 1.5rem;
   margin-top: 1rem;
 }

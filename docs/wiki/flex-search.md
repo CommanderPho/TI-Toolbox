@@ -9,7 +9,7 @@ permalink: /wiki/flex-search/
 
 - [SimNIBS Implementation: Leadfield-free TES Optimization Tutorial](https://simnibs.github.io/simnibs/build/html/tutorial/tes_flex_opt.html#tes-flex-opt)
 
-- [Data Source: Haber I, et al. Quantitative evaluation of transcranial electrical stimulation optimization methods](https://www.biorxiv.org/content/10.1101/2025.10.06.680781v3)
+- [Haber, I., Jackson, A., Thielscher, A., Hai, A., & Tononi, G. TI-Toolbox: An Open-Source Software for Temporal Interference Stimulation Research. Brain Stimulation](https://www.brainstimjrnl.com/article/S1935-861X(25)00418-8/fulltext)
 
 
 ## Overview
@@ -23,7 +23,7 @@ Flex Search uses differential evolution optimization to determine the best elect
 ## User Interface
 
 
-<img src="{{ site.baseurl }}/assets/imgs/gallery/UI_flex.png" alt="Flex Search Interface" style="width: 80%; max-width: 700px;">
+<img src="{{ site.baseurl }}/assets/imgs/UI/UI_flex.png" alt="Flex Search Interface" style="width: 80%; max-width: 700px;">
 
 The interface provides comprehensive controls for:
 - **Basic Parameters**: Subject selection, optimization goal, and post-processing method
@@ -46,11 +46,11 @@ We demonstrate the effectiveness of flex-search by optimizing electrode position
 
 <div class="image-row">
   <div class="image-container">
-    <img src="{{ site.baseurl }}/assets/imgs/wiki/flex-search/flex-search_max_TI_field.png" alt="Maximum TI Field">
+    <img src="{{ site.baseurl }}/assets/imgs/flex-search/flex-search_max_TI_field.png" alt="Maximum TI Field">
     <em>Maximum TI field distribution showing optimization results</em>
   </div>
   <div class="image-container">
-    <img src="{{ site.baseurl }}/assets/imgs/wiki/flex-search/flex-search_max_TI_ROI.png" alt="Maximum TI ROI Targeting">
+    <img src="{{ site.baseurl }}/assets/imgs/flex-search/flex-search_max_TI_ROI.png" alt="Maximum TI ROI Targeting">
     <em>ROI targeting analysis for maximum TI field optimization</em>
   </div>
 </div>
@@ -86,9 +86,9 @@ As described in the [original paper](https://www.sciencedirect.com/science/artic
 - **Dual Thresholds**: Independent thresholds for each region, allowing asymmetric optimization constraints
 - **Dynamic Adaptation**: Thresholds automatically adjust based on field distribution characteristics during optimization
 
-<img src="{{ site.baseurl }}/assets/imgs/wiki/flex-search/focality_thresholds.png" alt="Focality Threshold Analysis" style="width: 70%; max-width: 400px;">
+<img src="{{ site.baseurl }}/assets/imgs/flex-search/focality_thresholds.png" alt="Focality Threshold Analysis" style="width: 70%; max-width: 400px;">
 
-**Focality optimization analysis**: Comparative evaluation of threshold strategies reveals critical insights: threshold selection profoundly impacts results, with relative thresholds (50% of peak) yielding 75% higher focality than fixed thresholds, while 80% thresholds reduce focality by 37%, compared to fixed thresholds (0.1V/m and 0.3V/m) highlighting the importance of threshold optimization for precise neuromodulation. Dynamic % based thresholds were derived automatically from an intial pass of mean TImax search and applied to the upper bound only. The lower bound was kept at 20% from that value. *Data regarding focality thresholds and optimization performance comes from the supplementary information of Haber et al. 2025.*
+**Focality optimization analysis**: Comparative evaluation of threshold strategies reveals critical insights: threshold selection profoundly impacts results, with relative thresholds (50% of peak) yielding 75% higher focality than fixed thresholds, while 80% thresholds reduce focality by 37%, compared to fixed thresholds (0.1V/m and 0.3V/m) highlighting the importance of threshold optimization for precise neuromodulation. Dynamic % based thresholds were derived automatically from an intial pass of mean TImax search and applied to the upper bound only. The lower bound was kept at 20% from that value. *Data regarding focality thresholds and optimization performance comes from the supplementary information of the [TI-Toolbox reference](https://www.brainstimjrnl.com/article/S1935-861X(25)00418-8/fulltext).*
 
 ## Multi-Start Optimization
 
@@ -98,14 +98,24 @@ Flex Search supports multi-start optimization to ensure robust and reliable resu
 - **Best Solution Selection**: Automatically selects the optimization run with the lowest function value
 - **Comprehensive Reporting**: Generates multi-start summary files with run-by-run analysis
 
-<img src="{{ site.baseurl }}/assets/imgs/wiki/flex-search/multi-start.png" alt="Multi-Start Optimization Strategy" style="width: 50%; max-width: 400px;">
+<img src="{{ site.baseurl }}/assets/imgs/flex-search/multi-start.png" alt="Multi-Start Optimization Strategy" style="width: 50%; max-width: 400px;">
 
-**Multi-start optimization validation**: Analysis demonstrates that running multiple independent optimizations with different random seeds yields superior solutions compared to single runs; 4.18% improvement in mean TImax. While statistically significant, the modest gains should be weighed against the increased computational cost. *Data regarding multi-start optimization performance comes from the supplementary information of Haber et al. 2025.*
+**Multi-start optimization validation**: Analysis demonstrates that running multiple independent optimizations with different random seeds yields superior solutions compared to single runs; 4.18% improvement in mean TImax. While statistically significant, the modest gains should be weighed against the increased computational cost. *Data regarding multi-start optimization performance comes from the supplementary information of the [TI-Toolbox reference](https://www.brainstimjrnl.com/article/S1935-861X(25)00418-8/fulltext).*
 
 ## Electrode Mapping and Target Accessibility
 
 The transition from unconstrained optimization solutions to practical electrode montages represents a critical step in clinical translation. While genetic algorithms can identify theoretically optimal electrode positions anywhere on the scalp, its transition to clinical application may be difficult. Our electrode mapping algorithm bridges this gap by finding the best approximation of optimized positions using available electrode sites. For this study, we utilized the inner 185 electrodes of the GSN-HydroCel-256 system (EGI/Philips), which provides high-density coverage. A combinatorial optimization method that solves the assignment problem in polynomial time. By minimizing the total Euclidean distance between optimized and standard positions, this approach ensures good representation of the intended field distribution while maintaining practical feasibility.
 
-<img src="{{ site.baseurl }}/assets/imgs/wiki/flex-search/mapping_distance.png" alt="Electrode Mapping Distance Analysis" style="width: 70%; max-width: 600px;">
+<img src="{{ site.baseurl }}/assets/imgs/flex-search/mapping_distance.png" alt="Electrode Mapping Distance Analysis" style="width: 70%; max-width: 600px;">
 
-**Electrode mapping challenges**: Analysis of optimized electrode positions reveals depth-dependent mapping distances across anatomical targets, with subcortical structures like the hippocampus requiring significantly larger electrode separations (11.74 ± 5.33 mm) compared to cortical regions like the insula (7.30 ± 1.38 mm) or spherical ROIs (8.01 ± 1.43 mm). This pattern reflects the fundamental challenge of targeting deep brain structures with scalp electrodes, where optimal montages often requires large distances between electrodes which may be positioned on the lower scalp that does not have dense electrode coverage. *Data regarding electrode mapping distances comes from the supplementary information of Haber et al. 2025.*
+**Electrode mapping challenges**: Analysis of optimized electrode positions reveals depth-dependent mapping distances across anatomical targets, with subcortical structures like the hippocampus requiring significantly larger electrode separations (11.74 ± 5.33 mm) compared to cortical regions like the insula (7.30 ± 1.38 mm) or spherical ROIs (8.01 ± 1.43 mm). This pattern reflects the fundamental challenge of targeting deep brain structures with scalp electrodes, where optimal montages often requires large distances between electrodes which may be positioned on the lower scalp that does not have dense electrode coverage. *Data regarding electrode mapping distances comes from the supplementary information of the [TI-Toolbox reference](https://www.brainstimjrnl.com/article/S1935-861X(25)00418-8/fulltext).*
+
+## Advanced Features
+
+### Valid Skin Region Validation
+
+Flex-search optimization is constrained to valid skin regions where electrodes can be safely placed. The green region represents the valid skin area for electrode placement during optimization, while red "x" marks indicate HD-EEG electrodes that fall outside this valid region.
+
+<img src="{{ site.baseurl }}/assets/imgs/flex-search/valid_skin.png" alt="Valid Skin Region" style="width: 80%; max-width: 600px;">
+
+If electrode positions fall outside the valid skin region, the valid skin region can be manipulated through preprocessing, or ex-search can be used as an alternative since it is not constrained by skin region limitations.

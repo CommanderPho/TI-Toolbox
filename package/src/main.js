@@ -7,7 +7,8 @@ const {
   buildRuntimeEnv,
   ensureDisplayAccess,
   resetDisplayAccess,
-  patchProcessPathEnv
+  patchProcessPathEnv,
+  checkWindowsXServer
 } = require('./backend/env');
 const { validateProjectDirectory, initializeProject } = require('./backend/project-service');
 const DockerManager = require('./backend/docker-manager');
@@ -295,6 +296,11 @@ ipcMain.handle('start-toolbox', async (_event, projectDir) => {
 
     const initResult = await initializeProject(validatedDir);
     runtimeEnv = buildRuntimeEnv(validatedDir);
+    logger.info(`Runtime env set:`, { runtimeEnv: !!runtimeEnv, hasEnv: !!(runtimeEnv && runtimeEnv.env) });
+
+    if (!runtimeEnv || !runtimeEnv.env) {
+      throw new Error('Failed to build runtime environment for Windows');
+    }
 
     await ensureDisplayAccess();
     await dockerManager.prepareStack(runtimeEnv.env);
@@ -328,6 +334,20 @@ ipcMain.handle('stop-toolbox', async () => {
 
 ipcMain.handle('get-platform', () => os.platform());
 
+ipcMain.handle('check-xserver', async () => {
+  if (os.platform() !== 'win32') {
+    return { available: true, message: 'X server check not needed on this platform' };
+  }
+
+  try {
+    const result = await checkWindowsXServer();
+    return result;
+  } catch (error) {
+    logger.error('X server check failed:', error);
+    return { available: false, error: error.message };
+  }
+});
+
 ipcMain.handle('get-log-path', () => {
   const logFile = logger?.transports?.file?.getFile?.();
   return logFile?.path ?? '';
@@ -360,7 +380,7 @@ ipcMain.handle('create-new-project', async (_event, projectDir, includeExampleDa
       const { spawn } = require('child_process');
       const exampleDataScript = path.join(
         toolboxRoot,
-        'ti-toolbox',
+        'tit',
         'new_project',
         'example_data_manager.py'
       );
@@ -409,8 +429,8 @@ ipcMain.handle('create-new-project', async (_event, projectDir, includeExampleDa
     }
     
     // Copy configuration files
-    const configSrcDir = path.join(toolboxRoot, 'ti-toolbox', 'new_project', 'configs');
-    const configDstDir = path.join(validatedDir, 'code', 'ti-toolbox', 'config');
+    const configSrcDir = path.join(toolboxRoot, 'tit', 'new_project', 'configs');
+    const configDstDir = path.join(validatedDir, 'code', 'tit', 'config');
     
     if (fs.existsSync(configSrcDir)) {
       await fs.copy(configSrcDir, configDstDir, { overwrite: false });
@@ -455,8 +475,8 @@ This project contains structural MRI data and derivatives for simulating and ana
 - \`derivatives/\` - Processed data and analysis results
   - \`freesurfer/\` - FreeSurfer anatomical segmentation and surface reconstructions
   - \`SimNIBS/\` - SimNIBS head models and electric field simulations
-  - \`ti-toolbox/\` - TI-Toolbox simulation results and analyses
-- \`code/ti-toolbox/\` - Configuration files for the toolbox
+  - \`tit/\` - TI-Toolbox simulation results and analyses
+- \`code/tit/\` - Configuration files for the toolbox
 
 ## Software
 
@@ -480,7 +500,7 @@ This dataset follows the Brain Imaging Data Structure (BIDS) specification for o
     }
     
     // Create project status file
-    const statusDir = path.join(validatedDir, 'derivatives', 'ti-toolbox', '.ti-toolbox-info');
+    const statusDir = path.join(validatedDir, 'derivatives', 'tit', '.tit-info');
     const statusFile = path.join(statusDir, 'project_status.json');
     
     if (!fs.existsSync(statusFile)) {
@@ -495,7 +515,7 @@ This dataset follows the Brain Imaging Data Structure (BIDS) specification for o
         project_metadata: {
           name: path.basename(validatedDir),
           path: validatedDir,
-          version: '2.2.1'
+          version: '2.2.2'
         }
       };
       

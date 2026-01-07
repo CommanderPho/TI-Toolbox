@@ -14,9 +14,9 @@ import shutil
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-# Add ti-toolbox directory to path
+# Add tit directory to path
 project_root = os.path.join(os.path.dirname(__file__), '..')
-ti_toolbox_dir = os.path.join(project_root, 'ti-toolbox')
+ti_toolbox_dir = os.path.join(project_root, 'tit')
 sys.path.insert(0, ti_toolbox_dir)
 
 from core.paths import (
@@ -88,7 +88,7 @@ class TestPathManagerBasics:
         pm = PathManager()
         assert pm is not None
         assert hasattr(pm, '_project_dir')
-        assert hasattr(pm, '_project_dir_name')
+        assert hasattr(pm, 'project_dir_name')
 
 
 class TestProjectDetection:
@@ -111,7 +111,7 @@ class TestProjectDetection:
         reset_path_manager()  # Reset singleton after patching
         # Create new PathManager instance
         pm = PathManager()
-        detected = pm.detect_project_dir()
+        detected = pm.project_dir
 
         assert detected == str(project_dir)
 
@@ -121,7 +121,7 @@ class TestProjectDetection:
         monkeypatch.delenv(const.ENV_PROJECT_DIR_NAME, raising=False)
 
         pm = PathManager()
-        detected = pm.detect_project_dir()
+        detected = pm.project_dir
 
         assert detected is None
 
@@ -131,7 +131,7 @@ class TestProjectDetection:
         monkeypatch.setenv(const.ENV_PROJECT_DIR_NAME, project_name)
 
         pm = PathManager()
-        name = pm.get_project_dir_name()
+        name = pm.project_dir_name
 
         assert name == project_name
 
@@ -524,7 +524,7 @@ class TestEdgeCases:
         pm = PathManager()
 
         # Should not crash, but return None for project-dependent operations
-        assert pm.get_project_dir() is None
+        assert pm.project_dir is None
         assert pm.list_subjects() == []
 
 

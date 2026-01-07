@@ -1,0 +1,106 @@
+name: "Python Security Scan"
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'tit/**'
+      - 'tests/**'
+      - 'pyproject.toml'
+      - '.github/workflows/python-security.yml'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'tit/**'
+      - 'tests/**'
+      - 'pyproject.toml'
+      - '.github/workflows/python-security.yml'
+  schedule:
+    # Run weekly on Fridays at 15:00 UTC (after CodeQL runs at 14:44)
+    - cron: '0 15 * * 5'
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  bandit-scan:
+    name: Bandit Security Scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write  # Allow uploading SARIF results
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: Install bandit
+      run: |
+        python -m pip install --upgrade pip
+        pip install bandit[toml]
+
+    - name: Run Bandit Security Scan
+      run: |
+        # Run bandit with command line options
+        # Scan only the tit/ directory (main Python package)
+        # Exclude test files, use high confidence and medium+ severity
+        # Bandit returns non-zero exit code when issues are found, which is normal
+        python3 -m bandit -r tit/ \
+               -f json \
+               -o bandit-results.json \
+               --confidence-level high \
+               --severity-level medium \
+               --exclude "*/tests/*,*/test_*,__pycache__,.git" \
+               --exit-zero  # Force zero exit code so CI doesn't fail here
+
+        # Check if the file was created and has content
+        if [ -f bandit-results.json ] && [ -s bandit-results.json ]; then
+          echo "✅ Bandit scan completed successfully"
+        else
+          echo "❌ Bandit scan failed, creating fallback JSON"
+          echo '{"errors": ["Bandit scan failed"], "results": [], "metrics": {"_totals": {"loc": 0}}}' > bandit-results.json
+        fi
+
+    - name: Upload Bandit results to GitHub Security tab
+      if: always()  # Skip SARIF upload since bandit doesn't output SARIF format
+      run: |
+        echo "Note: Bandit results are not uploaded to Security tab (bandit uses custom JSON format)"
+        echo "Security scanning is already covered by CodeQL workflow"
+
+    # - name: Check for high-severity issues
+    #   run: |
+    #     # Check for high-severity issues using external script
+    #     python3 .github/scripts/check_bandit_severity.py
+
+    - name: Display Bandit JSON Results
+      if: always()
+      run: |
+        echo "## Bandit Security Scan Results" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        if [ -f bandit-results.json ]; then
+          echo "### File Info:" >> $GITHUB_STEP_SUMMARY
+          ls -la bandit-results.json >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "### Full JSON Results:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`json" >> $GITHUB_STEP_SUMMARY
+          cat bandit-results.json >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "### Summary Report:" >> $GITHUB_STEP_SUMMARY
+          # Generate summary statistics using external script
+          if python3 .github/scripts/generate_bandit_report.py >> $GITHUB_STEP_SUMMARY 2>&1; then
+            echo "Report generated successfully" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Report generation failed" >> $GITHUB_STEP_SUMMARY
+          fi
+        else
+          echo "❌ Bandit scan failed - no results file generated" >> $GITHUB_STEP_SUMMARY
+        fi

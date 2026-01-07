@@ -8,7 +8,7 @@ The Simulator module provides temporal interference (TI) simulation capabilities
 
 ## User Interface
 
-<img src="{{ site.baseurl }}/assets/imgs/wiki/simulator/UI_sim.png" alt="Simulator User Interface" style="width: 100%; max-width: 600px;">
+<img src="{{ site.baseurl }}/assets/imgs/UI/UI_sim.png" alt="Simulator User Interface" style="width: 100%; max-width: 600px;">
 
 The simulator GUI provides intuitive controls for all simulation parameters:
 
@@ -55,7 +55,7 @@ Mode that allows exploration of untraditional montages
 
 ## Simulation Modes
 
-<img src="{{ site.baseurl }}/assets/imgs/wiki/simulator/uTI_mTI.png" alt="Unipolar TI" style="width: 80%; max-width: 300px;">
+<img src="{{ site.baseurl }}/assets/imgs/simulator/uTI_mTI.png" alt="Unipolar TI" style="width: 80%; max-width: 300px;">
 <em>Left column unipolar (two channels) right column multipolar (four channels). Panels A,D: target and electrode montage. Panels B,E: high frequency fields. Panels C,F: modulation fields.</em>
 
 ### Unipolar Mode
@@ -108,6 +108,17 @@ The simulator supports different tissue conductivity models:
 - **Requirements**: Diffusion tensor imaging (DTI) scans
 - **Applications**: More realistic modeling of white matter tracts
 - **Processing**: Accounts for fiber orientation in field calculations
+
+#### DTI Eigen Vectors Visualization
+
+<img src="{{ site.baseurl }}/assets/imgs/simulator/dti_CC.png" alt="DTI Eigen Vectors - Corpus Callosum" style="width: 80%; max-width: 500px;">
+<img src="{{ site.baseurl }}/assets/imgs/simulator/dti_spinal.png" alt="DTI Eigen Vectors - Spinal Cord" style="width: 80%; max-width: 500px;">
+
+<em>Gmsh visualizations showing white and gray matter with overlaid eigen vectors that scale conductivity in anisotropic simulations. Top: Corpus callosum region showing organized fiber directions. Bottom: Spinal cord region with longitudinal fiber orientation.</em>
+
+These visualizations display the principal diffusion directions (eigen vectors) derived from diffusion tensor imaging (DTI) data, which are used to create direction-dependent conductivity tensors in anisotropic tissue modeling.
+
+For a complete explanation of DTI processing and tensor preparation, see the [SimNIBS wiki](https://simnibs.github.io/simnibs/build/html/documentation/command_line/dwi2cond.html).
 
 ---
 

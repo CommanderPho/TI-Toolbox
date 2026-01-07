@@ -1,6 +1,10 @@
 # Dockerfile.simnibs
 ## 22.04 LTS is a new test to check for simnibs solution.
 
+# docker build --no-cache --platform linux/amd64 \
+#   -f Dockerfile.test \
+#   -t idossha/ti-toolbox-test:latest .
+
 FROM ubuntu:22.04
 
 # Set noninteractive mode for apt-get
@@ -110,7 +114,7 @@ ENV SIMNIBSDIR="/root/SimNIBS-4.5"
 
 # Install additional Python packages to simnibs_python
 # Base packages for TI-Toolbox functionality
-RUN simnibs_python -m pip install meshio nilearn PyOpenGL-accelerate trimesh seaborn pytest-cov seaborn
+RUN simnibs_python -m pip install meshio nilearn PyOpenGL-accelerate trimesh seaborn pytest-cov seaborn scikit-image numpy-stl click bpy
 
 # Note: Electrode caps will be copied from mounted ti-toolbox/resources/ElectrodeCaps_MNI/
 # at runtime by entrypoint_test.sh (no need to download during build)

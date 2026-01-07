@@ -6,18 +6,18 @@ import pytest
 
 
 def load_flex_module():
-    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'ti-toolbox'))
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'tit'))
     sys.path.insert(0, base_dir)
     # Import the flex_config module which has parse_arguments
-    from opt.flex import flex_config
+    from tit.opt.flex import flex_config
     return flex_config
 
 
 def load_flex_utils_module():
-    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'ti-toolbox'))
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'tit'))
     sys.path.insert(0, base_dir)
     # Import the utils module which has roi_dirname
-    from opt.flex import utils
+    from tit.opt.flex import utils
     return utils
 
 
@@ -29,20 +29,22 @@ class TestParseArguments:
             '--subject', 'subj001',
             '--goal', 'mean',
             '--postproc', 'max_TI',
-            '--eeg-net', 'EGI_template',
-            '--radius', '5',
             '--current', '1',
-            '--roi-method', 'spherical'
+            '--roi-method', 'spherical',
+            '--electrode-shape', 'rect',
+            '--dimensions', '8,8',
+            '--thickness', '4.0'
         ]
         monkeypatch.setattr(sys, 'argv', argv)
         args = mod.parse_arguments()
         assert args.subject == 'subj001'
         assert args.goal == 'mean'
         assert args.postproc == 'max_TI'
-        assert args.eeg_net == 'EGI_template'
-        assert args.radius == 5
         assert args.current == 1
         assert args.roi_method == 'spherical'
+        assert args.electrode_shape == 'rect'
+        assert args.dimensions == '8,8'
+        assert args.thickness == 4.0
 
 
 class TestRoiDirname:

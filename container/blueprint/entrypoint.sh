@@ -6,6 +6,16 @@ touch ~/.bashrc
 # Source environment setup scripts
 [ -f "$FREESURFER_HOME/SetUpFreeSurfer.sh" ] && source "$FREESURFER_HOME/SetUpFreeSurfer.sh"
 
+# Ensure `tit` is importable system-wide in the SimNIBS python environment.
+# This fixes running python entrypoints by path like:
+#   simnibs_python /ti-toolbox/tit/cli/simulator.py
+if command -v simnibs_python >/dev/null 2>&1; then
+    if ! simnibs_python -c "import tit" >/dev/null 2>&1; then
+        # Editable install keeps imports working while still allowing mounted code changes.
+        simnibs_python -m pip install -e /ti-toolbox >/dev/null 2>&1 || true
+    fi
+fi
+
 # ============================================================================
 # Software Version Checks and Display
 # ============================================================================
@@ -64,37 +74,22 @@ print_software_info() {
     else
         echo "✗ tmux:           Not found"
     fi
-    
-    echo ""
-    echo "═══════════════════════════════════════════════════════════════════"
-    echo "  Available Commands:"
-    echo "═══════════════════════════════════════════════════════════════════"
-    echo ""
-    echo "  GUI              - Launch graphical user interface"
-    echo "  simulator        - Run TI simulations"
-    echo "  analyzer         - Analyze simulation results"
-    echo "  pre-process      - Preprocess MRI data"
-    echo "  movea            - MOVEA optimization"
-    echo "  ex-search        - Exhaustive search"
-    echo "  flex-search      - Flexible search"
-    echo "  group_analyzer   - Group analysis"
-    echo ""
-    echo "═══════════════════════════════════════════════════════════════════"
-    echo ""
 }
 
 # Make CLI scripts executable
-chmod +x /ti-toolbox/ti-toolbox/cli/*.sh
+# Note: CLI is Python-based; avoid chmod'ing non-existent legacy .sh scripts.
 
 # Create CLI script aliases (without .sh extension)
-alias GUI='GUI.sh'
-alias analyzer='analyzer.sh'
-alias ex-search='ex-search.sh'
-alias flex-search='flex-search.sh'
-alias group_analyzer='group_analyzer.sh'
-alias movea='movea.sh'
-alias pre-process='pre-process.sh'
-alias simulator='simulator.sh'
+alias GUI='simnibs_python -m tit.cli.gui'
+alias analyzer='simnibs_python -m tit.cli.analyzer'
+alias ex_search='simnibs_python -m tit.cli.ex_search'
+alias flex_search='simnibs_python -m tit.cli.flex_search'
+alias group_analyzer='simnibs_python -m tit.cli.group_analyzer'
+alias pre_process='simnibs_python -m tit.cli.pre_process'
+alias simulator='simnibs_python -m tit.cli.simulator'
+alias blender='simnibs_python -m tit.cli.vis_blender'
+alias create_leadfield='simnibs_python -m tit.cli.create_leadfield'
+alias cluster_permutation='simnibs_python -m tit.cli.cluster_permuatation'
 
 # Add environment setup to .bashrc
 {
@@ -102,15 +97,17 @@ alias simulator='simulator.sh'
     echo "source \"\$FREESURFER_HOME/SetUpFreeSurfer.sh\""
     echo ""
     echo "# TI-Toolbox CLI scripts"
-    echo "export PATH=\"\$PATH:/ti-toolbox/ti-toolbox/cli\""
-    echo "alias GUI='GUI.sh'"
-    echo "alias analyzer='analyzer.sh'"
-    echo "alias ex-search='ex-search.sh'"
-    echo "alias flex-search='flex-search.sh'"
-    echo "alias group_analyzer='group_analyzer.sh'"
-    echo "alias movea='movea.sh'"
-    echo "alias pre-process='pre-process.sh'"
-    echo "alias simulator='simulator.sh'"
+    echo "export PATH=\"\$PATH:/ti-toolbox/tit/cli\""
+    echo "alias GUI='simnibs_python -m tit.cli.gui'"
+    echo "alias analyzer='simnibs_python -m tit.cli.analyzer'"
+    echo "alias ex_search='simnibs_python -m tit.cli.ex_search'"
+    echo "alias flex_search='simnibs_python -m tit.cli.flex_search'"
+    echo "alias group_analyzer='simnibs_python -m tit.cli.group_analyzer'"
+    echo "alias pre_process='simnibs_python -m tit.cli.pre_process'"
+    echo "alias simulator='simnibs_python -m tit.cli.simulator'"
+    echo "alias blender='simnibs_python -m tit.cli.vis_blender'"
+    echo "alias create_leadfield='simnibs_python -m tit.cli.create_leadfield'"
+    echo "alias cluster_permutation='simnibs_python -m tit.cli.cluster_permuatation'"
     echo ""
     echo "# Display software info on interactive shell"
     echo "if [[ \$- == *i* ]] && [ -z \"\$TI_INFO_SHOWN\" ]; then"
@@ -123,6 +120,11 @@ alias simulator='simulator.sh'
 export XDG_RUNTIME_DIR=/tmp/runtime-root
 mkdir -p "$XDG_RUNTIME_DIR"
 chmod 700 "$XDG_RUNTIME_DIR"
+
+# Set PROJECT_DIR environment variable for CLI tools
+if [ -n "$PROJECT_DIR_NAME" ]; then
+    export PROJECT_DIR="/mnt/$PROJECT_DIR_NAME"
+fi
 
 # ============================================================================
 # Container-side initialization - minimal setup only

@@ -18,11 +18,29 @@ Ex-Search implements a true **exhaustive search** approach for Temporal Interfer
 - **High-Performance Processing**: Memory-efficient in-memory calculations with real-time progress tracking
 - **Comprehensive Metrics**: TImax, TImean, Focality analysis with automatic visualization
 
+## Search Modes
 
+Ex-Search supports two electrode assignment strategies:
+
+### Bucketed Mode (Original)
+Electrodes are pre-assigned to specific channels:
+- **E1+**: Electrodes for positive channel 1
+- **E1-**: Electrodes for negative channel 1
+- **E2+**: Electrodes for positive channel 2
+- **E2-**: Electrodes for negative channel 2
+
+**Combinations**: N₁ × N₂ × N₃ × N₄ (where N = electrodes per bucket)
+
+### Pooled Mode (New)
+All electrodes are pooled together and can be assigned to any channel position, with the constraint that each electrode is used only once per montage.
+
+**Combinations**: C(N,4) × 4! (where N = total electrodes, C = combinations)
+
+**Trade-off**: Larger search space and longer compute time but with absolute certainty to find optimal solution with given electrode space.
 
 ## User Interface
 
-<img src="{{ site.baseurl }}/assets/imgs/gallery/UI_ex.png" alt="Flex Search Interface" style="width: 80%; max-width: 700px;">
+<img src="{{ site.baseurl }}/assets/imgs/UI/UI_ex.png" alt="Flex Search Interface" style="width: 80%; max-width: 700px;">
 
 The interface provides controls for:
 - **Subject Selection**: Choose from available subjects with automatic leadfield scanning
@@ -40,11 +58,11 @@ Ex-Search automatically detects and supports multiple EEG electrode configuratio
 
 <div class="image-row">
   <div class="image-container">
-    <img src="{{ site.baseurl }}/assets/imgs/wiki/ex-search/ex-search_EEG10-20_Okamoto_2004_net.png" alt="EEG 10-20 Network">
+    <img src="{{ site.baseurl }}/assets/imgs/ex-search/ex-search_EEG10-20_Okamoto_2004_net.png" alt="EEG 10-20 Network">
     <em>EGI 10-20 Okamoto 2004 electrode configuration - widely used standard with 32 electrodes</em>
   </div>
   <div class="image-container">
-    <img src="{{ site.baseurl }}/assets/imgs/wiki/ex-search/ex-search_GSN256_net.png" alt="GSN 256 Network">
+    <img src="{{ site.baseurl }}/assets/imgs/ex-search/ex-search_GSN256_net.png" alt="GSN 256 Network">
     <em>GSN-HydroCel 256 electrode configuration - high-density net for precise targeting</em>
   </div>
 </div>
@@ -62,7 +80,7 @@ Ex-Search automatically detects and supports multiple EEG electrode configuratio
 
 
 
-![Ex-Search Distribution Analysis]({{ site.baseurl }}/assets/imgs/wiki/ex-search/ex-search_distribution.png)
+![Ex-Search Distribution Analysis]({{ site.baseurl }}/assets/imgs/ex-search/ex-search_distribution.png)
 
 ---
 

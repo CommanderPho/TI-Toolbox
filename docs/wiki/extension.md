@@ -9,7 +9,7 @@ The TI-Toolbox Extension System provides a modular framework for adding new tool
 ## Architecture
 
 ```
-ti-toolbox/gui/
+tit/gui/
 ├── extensions.py              # Main extension interface
 ├── settings_menu.py           # Settings menu with Extensions option
 └── extensions/                # Extension directory
@@ -101,7 +101,7 @@ Extensions can import and use TI-Toolbox core modules:
 
 ```python
 from core.paths import Paths
-from core.utils import Utils
+from core.roi import ROICoordinateHelper
 from core.constants import Constants
 from core import get_path_manager
 ```
@@ -129,7 +129,7 @@ project_dir/
 Extensions are distributed as single Python files. To install:
 
 1. Download the extension `.py` file
-2. Place it in `ti-toolbox/gui/extensions/` directory
+2. Place it in `tit/gui/extensions/` directory
 3. Restart TI-Toolbox or refresh extensions
 4. Access via **Settings → Extensions**
 

@@ -16,38 +16,86 @@ set -e
 PROJECT_DIR="/mnt/test_projectdir"
 export PROJECT_DIR_NAME=$(basename "$PROJECT_DIR")
 
+# Create montage configuration for the test
+CONFIG_DIR="$PROJECT_DIR/code/tit/config"
+MONTAGE_FILE="$CONFIG_DIR/montage_list.json"
+
+# Ensure config directory exists
+mkdir -p "$CONFIG_DIR"
+
+# Create montage_list.json with central_montage for Okamoto EEG net
+# Using standard 10-20 electrodes: Fz-Pz (frontal-parietal pair) and C3-C4 (left-right motor pair)
+cat > "$MONTAGE_FILE" << 'EOF'
+{
+  "nets": {
+    "EEG10-20_Okamoto_2004.csv": {
+      "uni_polar_montages": {
+        "central_montage": [
+          ["Fz", "Pz"],
+          ["C3", "C4"]
+        ]
+      },
+      "multi_polar_montages": {}
+    },
+    "EGI_template.csv": {
+      "uni_polar_montages": {},
+      "multi_polar_montages": {}
+    }
+  }
+}
+EOF
+
+chmod 666 "$MONTAGE_FILE"
+
 # Find simulator script
 if command -v simulator >/dev/null 2>&1; then
     SIM_CMD="simulator"
-elif [ -f "/ti-toolbox/ti-toolbox/cli/simulator.sh" ]; then
-    SIM_CMD="/ti-toolbox/ti-toolbox/cli/simulator.sh"
-elif [ -f "/development/ti-toolbox/cli/simulator.sh" ]; then
-    SIM_CMD="/development/ti-toolbox/cli/simulator.sh"
-elif [ -f "ti-toolbox/cli/simulator.sh" ]; then
-    SIM_CMD="./ti-toolbox/cli/simulator.sh"
+    SIM_ARGS=""
+elif [ -f "/ti-toolbox/tit/cli/simulator.py" ]; then
+    SIM_CMD="simnibs_python"
+    SIM_ARGS="/ti-toolbox/tit/cli/simulator.py"
+elif [ -f "/development/ti-toolbox/tit/cli/simulator.py" ]; then
+    SIM_CMD="simnibs_python"
+    SIM_ARGS="/development/ti-toolbox/tit/cli/simulator.py"
+elif [ -f "/development/tit/cli/simulator.py" ]; then
+    # Backward compatibility (older mounts)
+    SIM_CMD="simnibs_python"
+    SIM_ARGS="/development/tit/cli/simulator.py"
+elif [ -f "tit/cli/simulator.py" ]; then
+    SIM_CMD="simnibs_python"
+    SIM_ARGS="./tit/cli/simulator.py"
 else
-    echo "Error: simulator.sh not found"
+    echo "Error: simulator.py not found"
     exit 1
 fi
 
-# Set environment variables for non-interactive mode
-export SUBJECT_CHOICES="ernie_extended"
-export SIM_TYPE="isotropic"
-export SIMULATION_FRAMEWORK="montage"
-export SIM_MODE="U"
-export CONDUCTIVITY="scalar"
-export EEG_NETS="EEG10-20_extended_SPM12.csv"
-export SELECTED_MONTAGES="central_montage"
-export ELECTRODE_SHAPE="rect"
-export DIMENSIONS="2,2"
-export THICKNESS="4"
-export CURRENT="2"
+# Set simulation parameters
+SUBJECT="ernie_extended"
+EEG_NET="EEG10-20_Okamoto_2004.csv"
+MONTAGE="central_montage"
+CONDUCTIVITY="scalar"
+INTENSITY="2"
+ELECTRODE_SHAPE="rect"
+DIMENSIONS="2,2"
+THICKNESS="4"
 
 echo "Running simulator with:"
-echo "  Subject: $SUBJECT_CHOICES"
-echo "  Sim Mode: $SIM_MODE (U=Unipolar TI)"
+echo "  Subject: $SUBJECT"
+echo "  EEG Net: $EEG_NET"
+echo "  Montage: $MONTAGE"
 echo "  Conductivity: $CONDUCTIVITY"
-echo "  Montage: $SELECTED_MONTAGES"
+echo "  Intensity: $INTENSITY mA"
+echo "  Electrode Shape: $ELECTRODE_SHAPE"
+echo "  Dimensions: $DIMENSIONS mm"
+echo "  Thickness: $THICKNESS mm"
 
-# Run simulator in non-interactive mode
-"$SIM_CMD" --run-direct
+# Run simulator in non-interactive mode with proper arguments
+"$SIM_CMD" "$SIM_ARGS" run \
+    --subject "$SUBJECT" \
+    --montage "$MONTAGE" \
+    --eeg-net "$EEG_NET" \
+    --conductivity "$CONDUCTIVITY" \
+    --intensity "$INTENSITY" \
+    --shape "$ELECTRODE_SHAPE" \
+    --dimensions "$DIMENSIONS" \
+    --thickness "$THICKNESS"

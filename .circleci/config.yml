@@ -32,6 +32,7 @@ jobs:
       - prepare-test-image
       - run:
           name: Run complete test suite with coverage
+          no_output_timeout: 30m
           command: |
             set -euo pipefail
 
@@ -49,15 +50,16 @@ jobs:
             echo "Test image: ti-test:latest"
             echo ""
 
-            # Run all tests with coverage
-            # - Mounts PR code at /ti-toolbox (matches production environment)
+            # Run all tests with coverage and verbose output
+            # - Mounts PR code at /tit (matches production environment)
             # - Script copies ElectrodeCaps and tes_flex to SimNIBS
+            # - Verbose mode ensures continuous output to prevent timeout
             docker run --rm \
-              -v "${WORKSPACE}:/ti-toolbox" \
+              -v "${WORKSPACE}:/tit" \
               -v /tmp/test_projectdir:/mnt/test_projectdir \
               -v /tmp/test-results:/tmp/test-results \
               -v /tmp/coverage:/tmp/coverage \
-              -w /ti-toolbox \
+              -w /tit \
               ti-test:latest \
               bash -c './tests/run_tests.sh --verbose --coverage'
 
@@ -96,7 +98,7 @@ jobs:
             # Upload coverage report with proper configuration
             # -t: Codecov token (set in CircleCI environment)
             # -f: Coverage file location
-            # -F: Flags to categorize coverage (matches .codecov.yml flags)
+            # -F: Flags to categorize coverage (matches codecov.yml flags)
             # -n: Custom name for the upload
             # -B: Branch name
             # -C: Commit SHA
@@ -104,7 +106,7 @@ jobs:
             ./codecov \
               -t ${CODECOV_TOKEN} \
               -f /tmp/coverage/coverage.xml \
-              -F unittests,core,simulator,analyzer,optimizer \
+              -F unittests,core,simulator,analyzer,optimizer,stats,viz \
               -n "CircleCI-${CIRCLE_BUILD_NUM}" \
               -B "${CIRCLE_BRANCH}" \
               -C "${CIRCLE_SHA1}" \
@@ -125,18 +127,16 @@ jobs:
 
 workflows:
   version: 2
-  # Only run on pull requests to main branch
-  # This workflow will NOT run on direct commits to main
-  pull_request_workflow:
+
+  # Run on all branches including main
+  # This ensures:
+  # 1. Tests run on PRs (feature branches)
+  # 2. Tests run on main branch for coverage tracking
+  # 3. Codecov can track coverage trends over time
+  test_workflow:
     jobs:
       - build-and-run-tests:
           filters:
             branches:
-              # Run on all branches EXCEPT main/master (where PRs come FROM)
-              # Combined with GitHub branch protection, this ensures:
-              # 1. Tests run when opening PR from feature branch -> main
-              # 2. Tests do NOT run on direct commits to main
-              # 3. Tests do NOT run when PR is merged to main
-              ignore:
-                - main
-                - master
+              # Run on all branches
+              only: /.*/

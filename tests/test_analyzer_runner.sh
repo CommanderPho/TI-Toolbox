@@ -19,12 +19,11 @@ export PROJECT_DIR_NAME=$(basename "$PROJECT_DIR")
 # Find analyzer script
 if command -v analyzer >/dev/null 2>&1; then
     ANALYZER_CMD="analyzer"
-elif [ -f "/ti-toolbox/ti-toolbox/cli/analyzer.sh" ]; then
-    ANALYZER_CMD="/ti-toolbox/ti-toolbox/cli/analyzer.sh"
-elif [ -f "ti-toolbox/cli/analyzer.sh" ]; then
-    ANALYZER_CMD="./ti-toolbox/cli/analyzer.sh"
+elif command -v simnibs_python >/dev/null 2>&1; then
+    # Preferred: Python Click CLI replacement
+    ANALYZER_CMD="simnibs_python -m tit.cli.analyzer"
 else
-    echo "Error: analyzer.sh not found"
+    echo "Error: analyzer CLI not found"
     exit 1
 fi
 
@@ -36,8 +35,9 @@ export ANALYSIS_TYPE="spherical"
 export FIELD_PATH="$PROJECT_DIR/derivatives/SimNIBS/sub-ernie_extended/Simulations/test_montage/TI/mesh/grey_test_montage_TI.msh"
 export COORDINATES="-50 0 0"
 export RADIUS="5"
+export COORDINATE_SPACE="subject"
 export VISUALIZE="true"
 
 # Run analyzer in non-interactive mode
 export ANALYSIS_MODE="single"
-"$ANALYZER_CMD" --run-direct
+eval "$ANALYZER_CMD --run-direct"

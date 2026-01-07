@@ -1,6 +1,10 @@
 # Dockerfile.simnibs
 ## 22.04 LTS is a new test to check for simnibs solution.
 
+# docker build --no-cache --platform linux/amd64 \
+#   -f Dockerfile.simnibs \
+#   -t idossha/simnibs:{version} .
+
 FROM ubuntu:22.04
 
 # Set noninteractive mode for apt-get
@@ -116,7 +120,7 @@ ENV PATH="/root/SimNIBS-4.5/bin:$PATH"
 ENV SIMNIBSDIR="/root/SimNIBS-4.5"
 
 # Install additional Python packages to simnibs_python
-RUN simnibs_python -m pip install meshio nilearn PyOpenGL-accelerate trimesh seaborn
+RUN simnibs_python -m pip install meshio nilearn PyOpenGL-accelerate trimesh seaborn scikit-image numpy-stl click bpy
 
 ########### TI-Toolbox ########################
 RUN git clone https://github.com/idossha/TI-Toolbox.git /ti-toolbox
@@ -131,6 +135,9 @@ RUN cp /ti-toolbox/resources/ElectrodeCaps_MNI/* $SIMNIBSDIR/resources/Electrode
 # Flex extention by TI-Toolbox team
 RUN rm -f $SIMNIBSDIR/simnibs/optimization/tes_flex_optimization/tes_flex_optimization.py && \
     cp /ti-toolbox/resources/map-electrodes/tes_flex_optimization.py $SIMNIBSDIR/simnibs/optimization/tes_flex_optimization/tes_flex_optimization.py
+
+# Install TIT package (non-editable). CLI entrypoints are defined in pyproject.toml.
+RUN cd /ti-toolbox && simnibs_python -m pip install --no-cache-dir .
 
 ############ CLI tools ###############
 
