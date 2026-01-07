@@ -156,7 +156,7 @@ class MainWindow(QtWidgets.QMainWindow):
         main_layout.addWidget(self.tab_widget)
         
         # Set window properties and center on screen
-        self.resize(1000, 800)
+        self.resize(1650, 800)
         self.center_on_screen()
         
     def center_on_screen(self):
