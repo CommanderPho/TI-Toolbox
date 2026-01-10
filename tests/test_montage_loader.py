@@ -39,13 +39,13 @@ class TestLoadMontageFile:
         """Test loading an existing montage configuration file."""
         # Create test project structure
         project_dir = tmp_path / "test_project"
-        config_dir = project_dir / "code" / "tit" / "config"
+        config_dir = project_dir / "code" / "ti-toolbox" / "config"
         config_dir.mkdir(parents=True)
 
         montage_file = config_dir / "montage_list.json"
         test_montages = {
             "nets": {
-                "EGI_template.csv": {
+                "GSN-HydroCel-185": {
                     "uni_polar_montages": {
                         "montage1": [["E1", "E2"], ["E3", "E4"]]
                     },
@@ -60,7 +60,7 @@ class TestLoadMontageFile:
             json.dump(test_montages, f)
 
         # Test loading
-        result = load_montage_file(str(project_dir), "EGI_template.csv")
+        result = load_montage_file(str(project_dir), "GSN-HydroCel-185")
 
         assert "uni_polar_montages" in result
         assert "multi_polar_montages" in result
@@ -70,14 +70,15 @@ class TestLoadMontageFile:
     def test_create_default_montage_file(self, tmp_path):
         """Test creating default montage file when it doesn't exist."""
         project_dir = tmp_path / "test_project"
-        config_dir = project_dir / "code" / "tit" / "config"
+        project_dir.mkdir()  # Create the project directory
+        config_dir = project_dir / "code" / "ti-toolbox" / "config"
 
         # File doesn't exist yet
         montage_file = config_dir / "montage_list.json"
         assert not montage_file.exists()
 
         # Should create default file
-        result = load_montage_file(str(project_dir), "EGI_template.csv")
+        result = load_montage_file(str(project_dir), "GSN-HydroCel-185")
 
         # Check file was created
         assert montage_file.exists()
@@ -87,13 +88,13 @@ class TestLoadMontageFile:
     def test_missing_eeg_net(self, tmp_path):
         """Test error when requested EEG net not found."""
         project_dir = tmp_path / "test_project"
-        config_dir = project_dir / "code" / "tit" / "config"
+        config_dir = project_dir / "code" / "ti-toolbox" / "config"
         config_dir.mkdir(parents=True)
 
         montage_file = config_dir / "montage_list.json"
         test_montages = {
             "nets": {
-                "EGI_template.csv": {
+                "GSN-HydroCel-185": {
                     "uni_polar_montages": {}
                 }
             }
@@ -102,14 +103,15 @@ class TestLoadMontageFile:
         with open(montage_file, 'w') as f:
             json.dump(test_montages, f)
 
-        # Test missing net
-        with pytest.raises(ValueError, match="EEG net 'unknown_net.csv' not found"):
-            load_montage_file(str(project_dir), "unknown_net.csv")
+        # Missing nets are treated as empty (callers may create montages on demand)
+        net_data = load_montage_file(str(project_dir), "unknown_net.csv")
+        assert net_data["uni_polar_montages"] == {}
+        assert net_data["multi_polar_montages"] == {}
 
     def test_invalid_json(self, tmp_path):
         """Test error handling for invalid JSON file."""
         project_dir = tmp_path / "test_project"
-        config_dir = project_dir / "code" / "tit" / "config"
+        config_dir = project_dir / "code" / "ti-toolbox" / "config"
         config_dir.mkdir(parents=True)
 
         montage_file = config_dir / "montage_list.json"
@@ -117,7 +119,7 @@ class TestLoadMontageFile:
             f.write("{ invalid json }")
 
         with pytest.raises(json.JSONDecodeError):
-            load_montage_file(str(project_dir), "EGI_template.csv")
+            load_montage_file(str(project_dir), "GSN-HydroCel-185")
 
 
 @pytest.mark.unit
@@ -217,7 +219,7 @@ class TestParseFlexMontage:
             "name": "flex_mapped_1",
             "type": "flex_mapped",
             "pairs": [["E1", "E2"], ["E3", "E4"]],
-            "eeg_net": "EGI_template.csv"
+            "eeg_net": "GSN-HydroCel-185"
         }
 
         result = parse_flex_montage(flex_data)
@@ -225,7 +227,7 @@ class TestParseFlexMontage:
         assert isinstance(result, MontageConfig)
         assert result.name == "flex_mapped_1"
         assert result.is_xyz is False
-        assert result.eeg_net == "EGI_template.csv"
+        assert result.eeg_net == "GSN-HydroCel-185"
         assert len(result.electrode_pairs) == 2
         assert result.electrode_pairs[0] == ("E1", "E2")
 
@@ -289,13 +291,13 @@ class TestLoadMontages:
     def test_load_regular_montages_only(self, tmp_path):
         """Test loading regular montages without flex montages."""
         project_dir = tmp_path / "test_project"
-        config_dir = project_dir / "code" / "tit" / "config"
+        config_dir = project_dir / "code" / "ti-toolbox" / "config"
         config_dir.mkdir(parents=True)
 
         montage_file = config_dir / "montage_list.json"
         test_montages = {
             "nets": {
-                "EGI_template.csv": {
+                "GSN-HydroCel-185": {
                     "uni_polar_montages": {
                         "montage1": [["E1", "E2"], ["E3", "E4"]]
                     },
@@ -312,7 +314,7 @@ class TestLoadMontages:
         result = load_montages(
             montage_names=["montage1", "montage2"],
             project_dir=str(project_dir),
-            eeg_net="EGI_template.csv",
+            eeg_net="GSN-HydroCel-185",
             include_flex=False
         )
 
@@ -324,13 +326,13 @@ class TestLoadMontages:
     def test_load_with_flex_montages(self, tmp_path):
         """Test loading both regular and flex montages."""
         project_dir = tmp_path / "test_project"
-        config_dir = project_dir / "code" / "tit" / "config"
+        config_dir = project_dir / "code" / "ti-toolbox" / "config"
         config_dir.mkdir(parents=True)
 
         montage_file = config_dir / "montage_list.json"
         test_montages = {
             "nets": {
-                "EGI_template.csv": {
+                "GSN-HydroCel-185": {
                     "uni_polar_montages": {
                         "montage1": [["E1", "E2"], ["E3", "E4"]]
                     },
@@ -348,7 +350,7 @@ class TestLoadMontages:
             "name": "flex1",
             "type": "flex_mapped",
             "pairs": [["E5", "E6"], ["E7", "E8"]],
-            "eeg_net": "EGI_template.csv"
+            "eeg_net": "GSN-HydroCel-185"
         }]
 
         with open(flex_file, 'w') as f:
@@ -358,7 +360,7 @@ class TestLoadMontages:
             result = load_montages(
                 montage_names=["montage1"],
                 project_dir=str(project_dir),
-                eeg_net="EGI_template.csv",
+                eeg_net="GSN-HydroCel-185",
                 include_flex=True
             )
 
@@ -369,7 +371,7 @@ class TestLoadMontages:
     def test_freehand_mode(self, tmp_path):
         """Test is_xyz flag for freehand mode."""
         project_dir = tmp_path / "test_project"
-        config_dir = project_dir / "code" / "tit" / "config"
+        config_dir = project_dir / "code" / "ti-toolbox" / "config"
         config_dir.mkdir(parents=True)
 
         montage_file = config_dir / "montage_list.json"
@@ -400,13 +402,13 @@ class TestLoadMontages:
     def test_skip_failed_flex_montages(self, tmp_path, capsys):
         """Test that failed flex montages are skipped with warning."""
         project_dir = tmp_path / "test_project"
-        config_dir = project_dir / "code" / "tit" / "config"
+        config_dir = project_dir / "code" / "ti-toolbox" / "config"
         config_dir.mkdir(parents=True)
 
         montage_file = config_dir / "montage_list.json"
         test_montages = {
             "nets": {
-                "EGI_template.csv": {
+                "GSN-HydroCel-185": {
                     "uni_polar_montages": {},
                     "multi_polar_montages": {}
                 }
@@ -430,7 +432,7 @@ class TestLoadMontages:
             result = load_montages(
                 montage_names=[],
                 project_dir=str(project_dir),
-                eeg_net="EGI_template.csv",
+                eeg_net="GSN-HydroCel-185",
                 include_flex=True
             )
 
@@ -444,13 +446,13 @@ class TestLoadMontages:
     def test_empty_montage_list(self, tmp_path):
         """Test loading with empty montage list."""
         project_dir = tmp_path / "test_project"
-        config_dir = project_dir / "code" / "tit" / "config"
+        config_dir = project_dir / "code" / "ti-toolbox" / "config"
         config_dir.mkdir(parents=True)
 
         montage_file = config_dir / "montage_list.json"
         test_montages = {
             "nets": {
-                "EGI_template.csv": {
+                "GSN-HydroCel-185": {
                     "uni_polar_montages": {},
                     "multi_polar_montages": {}
                 }
@@ -463,7 +465,7 @@ class TestLoadMontages:
         result = load_montages(
             montage_names=[],
             project_dir=str(project_dir),
-            eeg_net="EGI_template.csv",
+            eeg_net="GSN-HydroCel-185",
             include_flex=False
         )
 
@@ -472,13 +474,13 @@ class TestLoadMontages:
     def test_montage_priority(self, tmp_path):
         """Test that multi_polar is checked before uni_polar."""
         project_dir = tmp_path / "test_project"
-        config_dir = project_dir / "code" / "tit" / "config"
+        config_dir = project_dir / "code" / "ti-toolbox" / "config"
         config_dir.mkdir(parents=True)
 
         montage_file = config_dir / "montage_list.json"
         test_montages = {
             "nets": {
-                "EGI_template.csv": {
+                "GSN-HydroCel-185": {
                     "uni_polar_montages": {
                         "montage1": [["E1", "E2"], ["E3", "E4"]]
                     },
@@ -495,7 +497,7 @@ class TestLoadMontages:
         result = load_montages(
             montage_names=["montage1"],
             project_dir=str(project_dir),
-            eeg_net="EGI_template.csv",
+            eeg_net="GSN-HydroCel-185",
             include_flex=False
         )
 

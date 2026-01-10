@@ -4,7 +4,7 @@ title: Wiki
 permalink: /wiki/
 ---
 
-Welcome to the Temporal Interference Toolbox Wiki. Here you'll find detailed guides and documentation for all aspects of the toolbox.
+Welcome to the Temporal Interference Toolbox Wiki. Here you'll find detailed guides and documentation for all aspects of the toolbox. Check out our [Video Tutorials](video-tutorials) for step-by-step visual guides.
 
 
 ### Core Functionality
@@ -14,6 +14,8 @@ Welcome to the Temporal Interference Toolbox Wiki. Here you'll find detailed gui
 - **[Simulator](simulator)** -  Simualtor with flexible parameter input
 - **[Analyzer](analyzer)** - Comprehensive field analysis for both mesh and voxel data
 - **[Visualizers](visualizers)** - Gmsh and Freeview integration for mesh and NIfTI visualization
+- **[GUI](gui)** - Main graphical interface of TI-Toolbox
+- **[CLI](cli)** - Interactive and direct command line interface with TI-Toolbox
 
 ### Embedded Tools
 - **[Reports](reports)** - Understanding HTML simulation reports and results

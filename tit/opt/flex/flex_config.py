@@ -35,12 +35,12 @@ def parse_arguments() -> argparse.Namespace:
     )
 
     # Core parameters
-    p.add_argument("--subject", required=True, help="Subject ID")
+    p.add_argument("--subject", "-sub", required=True, help="Subject ID")
     p.add_argument("--goal", choices=["mean", "max", "focality"], required=True,
                    help="Optimization goal")
     p.add_argument("--postproc", choices=["max_TI", "dir_TI_normal", "dir_TI_tangential"],
                    required=True, help="Post-processing method")
-    p.add_argument("--eeg-net",
+    p.add_argument("--eeg-net", "-eeg",
                    help="CSV filename in eeg_positions (without .csv). Required when --enable-mapping is used.")
     p.add_argument("--current", type=float, required=True,
                    help="Electrode current in mA")
@@ -115,20 +115,12 @@ def build_optimization(args: argparse.Namespace) -> opt_struct.TesFlexOptimizati
     """
     opt = opt_struct.TesFlexOptimization()
 
-    # Get project directory
-    proj_dir = os.getenv("PROJECT_DIR")
-    if not proj_dir:
-        raise SystemExit("[flex-search] PROJECT_DIR env-var is missing")
+    # Docker-first: resolve paths via PathManager templates (centralized conventions).
+    from tit.core import get_path_manager
 
-    # Set paths
-    opt.subpath = os.path.join(
-        proj_dir, "derivatives", "SimNIBS",
-        f"sub-{args.subject}", f"m2m_{args.subject}"
-    )
-    opt.output_folder = os.path.join(
-        proj_dir, "derivatives", "SimNIBS",
-        f"sub-{args.subject}", const.DIR_FLEX_SEARCH, utils.roi_dirname(args)
-    )
+    pm = get_path_manager()
+    opt.subpath = pm.path("m2m", subject_id=args.subject)
+    opt.output_folder = pm.path("flex_search_run", subject_id=args.subject, search_name=utils.roi_dirname(args))
     os.makedirs(opt.output_folder, exist_ok=True)
 
     # Configure goals and thresholds
@@ -167,9 +159,8 @@ def build_optimization(args: argparse.Namespace) -> opt_struct.TesFlexOptimizati
     # Configure mapping
     if args.enable_mapping:
         opt.map_to_net_electrodes = True
-        opt.net_electrode_file = os.path.join(
-            opt.subpath, "eeg_positions", f"{args.eeg_net}.csv"
-        )
+        eeg_dir = pm.path("eeg_positions", subject_id=args.subject)
+        opt.net_electrode_file = os.path.join(eeg_dir, f"{args.eeg_net}.csv")
         if not os.path.isfile(opt.net_electrode_file):
             raise SystemExit(f"EEG net file not found: {opt.net_electrode_file}")
         if hasattr(opt, "run_mapped_electrodes_simulation") and not args.disable_mapping_simulation:

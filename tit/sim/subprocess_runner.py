@@ -42,8 +42,7 @@ def _build_logger(subject_id: str, project_dir: str, debug: bool):
     from tit import logger as logging_util
 
     pm = get_path_manager()
-    derivatives_dir = pm.get_derivatives_dir()
-    log_dir = os.path.join(derivatives_dir, "tit", "logs", f"sub-{subject_id}")
+    log_dir = pm.path("ti_logs", subject_id=subject_id)
     os.makedirs(log_dir, exist_ok=True)
     log_file = os.path.join(log_dir, f"Simulator_{time.strftime('%Y%m%d_%H%M%S')}.log")
 
@@ -150,7 +149,7 @@ def main(argv=None) -> int:
                 thickness=float(electrode.get("thickness", 4.0)),
                 sponge_thickness=float(electrode.get("sponge_thickness", 2.0)),
             ),
-            eeg_net=str(cfg.get("eeg_net") or "EGI_template.csv"),
+            eeg_net=str(cfg.get("eeg_net") or "GSN-HydroCel-185.csv"),
             parallel=ParallelConfig(
                 enabled=bool(parallel.get("enabled", False)),
                 max_workers=int(parallel.get("max_workers", 0)),

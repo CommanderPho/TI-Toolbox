@@ -19,9 +19,9 @@ from tit.core import get_path_manager
 class CreateLeadfieldCLI(BaseCLI):
     def __init__(self) -> None:
         super().__init__("Create leadfield matrices for a subject.")
-        self.add_argument(ArgumentDefinition(name="subject", type=str, help="Subject ID", required=True))
-        self.add_argument(ArgumentDefinition(name="eeg_net", type=str, help="EEG cap CSV filename (e.g., EGI_template.csv)", required=True))
-        self.add_argument(ArgumentDefinition(name="tissues", type=str, help="Comma-separated tissue tags (default 1,2)", default="1,2"))
+        self.add_argument(ArgumentDefinition(name="subject", type=str, help="Subject ID", required=True, flags=["--subject", "--sub"]))
+        self.add_argument(ArgumentDefinition(name="eeg_net", type=str, help="EEG cap CSV filename (e.g., GSN-HydroCel-185.csv)", required=True, flags=["--eeg-net", "--eeg"]))
+        self.add_argument(ArgumentDefinition(name="tissues", type=str, nargs="+", help="Tissue tags (comma-separated or space-separated). Default: 1 2", default=["1", "2"]))
 
     def run_interactive(self) -> int:
         pm = get_path_manager()
@@ -51,19 +51,17 @@ class CreateLeadfieldCLI(BaseCLI):
         return self.execute({"subject": subject_id, "eeg_net": eeg_net, "tissues": tissues})
 
     def execute(self, args: Dict[str, Any]) -> int:
-        from tit.opt.leadfield import LeadfieldGenerator
-
         pm = get_path_manager()
         if not pm.project_dir:
             raise RuntimeError("Project directory not resolved. In Docker set PROJECT_DIR_NAME so /mnt/<name> exists.")
 
         subject_id = str(args["subject"])
-        m2m_dir = pm.get_m2m_dir(subject_id)
-        if not m2m_dir:
+        m2m_dir = pm.path("m2m", subject_id=subject_id)
+        if not Path(m2m_dir).is_dir():
             raise RuntimeError(f"m2m directory not found for subject {subject_id}")
 
-        eeg_pos_dir = pm.get_eeg_positions_dir(subject_id)
-        if not eeg_pos_dir:
+        eeg_pos_dir = pm.path("eeg_positions", subject_id=subject_id)
+        if not Path(eeg_pos_dir).is_dir():
             raise RuntimeError(f"EEG positions directory not found for subject {subject_id}")
 
         eeg_net = str(args["eeg_net"])
@@ -71,14 +69,15 @@ class CreateLeadfieldCLI(BaseCLI):
         if not Path(eeg_cap_path).exists():
             raise RuntimeError(f"EEG cap CSV not found: {eeg_cap_path}")
 
-        tissues = [int(x.strip()) for x in str(args.get("tissues", "1,2")).split(",") if x.strip()]
+        tissues_raw = utils.split_csv_or_tokens(args.get("tissues"))
+        tissues = [int(x.strip()) for x in tissues_raw if str(x).strip()]
         if not tissues:
             tissues = [1, 2]
 
-        out_dir = pm.get_leadfield_dir(subject_id)
-        if not out_dir:
-            raise RuntimeError("Leadfield output dir could not be resolved.")
+        out_dir = pm.ensure_dir("leadfields", subject_id=subject_id)
 
+        # Lazy import: leadfield generation depends on SimNIBS.
+        from tit.opt.leadfield import LeadfieldGenerator
         gen = LeadfieldGenerator(m2m_dir, electrode_cap=eeg_net)
         gen.generate_leadfield(output_dir=str(out_dir), tissues=tissues, eeg_cap_path=eeg_cap_path)
         utils.echo_success(f"Leadfield created in: {out_dir}")

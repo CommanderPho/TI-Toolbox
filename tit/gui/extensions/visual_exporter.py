@@ -12,6 +12,7 @@ import subprocess
 import tempfile
 import glob
 import io
+import logging
 from pathlib import Path
 from datetime import datetime
 from contextlib import redirect_stdout, redirect_stderr
@@ -19,7 +20,7 @@ from PyQt5 import QtWidgets, QtCore
 
 # Extension metadata (required)
 EXTENSION_NAME = "3D Visual Exporter"
-EXTENSION_DESCRIPTION = "Export STL/PLY cortical regions, vector clouds, and electrode placements for 3D visualization"
+EXTENSION_DESCRIPTION = "Export STL/PLY cortical regions, vector clouds, and montage visualizations for 3D visualization"
 
 from tit.core import get_path_manager
 from tit.core import constants as const
@@ -28,7 +29,10 @@ from tit.gui.components.action_buttons import RunStopButtons
 from tit.logger import get_logger
 from tit.tools.extract_labels import extract_labels_from_nifti
 from tit.tools.nifti_to_mesh import nifti_to_mesh
-from tit.blender.electrode_placement import ElectrodePlacer, ElectrodePlacementConfig
+
+# Repo/package path helper used to invoke bundled CLI/blender scripts in subprocesses.
+# `.../tit/gui/extensions/visual_exporter.py` -> parents[2] == `.../tit`
+ti_toolbox_path = Path(__file__).resolve().parents[2]
 
 
 class Mode:
@@ -53,9 +57,13 @@ class WorkerThread(QtCore.QThread):
         try:
             for cmd, cwd in self.commands:
                 self.output_signal.emit(f"\n$ {' '.join(cmd)}")
+                # Force unbuffered Python output so GUI receives logs immediately.
+                env = os.environ.copy()
+                env.setdefault("PYTHONUNBUFFERED", "1")
                 self._process = subprocess.Popen(
                     cmd,
                     cwd=cwd or None,
+                    env=env,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     text=True,
@@ -111,8 +119,8 @@ class VisualExporterWidget(QtWidgets.QWidget):
         layout.addWidget(header_label)
 
         desc = QtWidgets.QLabel(
-            "Export cortical regions to STL/PLY, vector clouds (TI/mTI), and electrode placements for 3D visualization.\n"
-            "Electrode placement uses scalp surface extracted from subject mesh files."
+            "Export cortical regions to STL/PLY, vector clouds (TI/mTI), and montage visualizations for 3D visualization.\n"
+            "Montage visualizer creates publication-ready Blender scenes with electrodes from simulation config."
         )
         desc.setWordWrap(True)
         desc.setStyleSheet("color: #666; padding: 5px;")
@@ -132,6 +140,13 @@ class VisualExporterWidget(QtWidgets.QWidget):
         config_layout.addWidget(QtWidgets.QLabel("Simulation:"), row, 2)
         self.simulation_combo = QtWidgets.QComboBox()
         config_layout.addWidget(self.simulation_combo, row, 3)
+
+        # Refresh button
+        self.refresh_btn = QtWidgets.QPushButton("Refresh")
+        self.refresh_btn.setToolTip("Refresh subjects, simulations, and regions lists")
+        self.refresh_btn.clicked.connect(self._refresh_all)
+        self.refresh_btn.setMaximumWidth(80)
+        config_layout.addWidget(self.refresh_btn, row, 4)
         row += 1
 
         # Mesh selection is automatic via PathManager (no manual controls)
@@ -144,7 +159,7 @@ class VisualExporterWidget(QtWidgets.QWidget):
         radio_layout = QtWidgets.QHBoxLayout()
         self.rb_stl = QtWidgets.QRadioButton("Cortical Regions")
         self.rb_vec = QtWidgets.QRadioButton("Field Vectors")
-        self.rb_electrodes = QtWidgets.QRadioButton("Electrode Placement")
+        self.rb_electrodes = QtWidgets.QRadioButton("Montage Visualizer")
         self.rb_subcortical = QtWidgets.QRadioButton("Sub-cortical")
         self.rb_stl.setChecked(True)
 
@@ -389,44 +404,51 @@ class VisualExporterWidget(QtWidgets.QWidget):
         w = QtWidgets.QWidget()
         outer = QtWidgets.QVBoxLayout(w)
 
-        # Electrode Configuration
-        config_group = QtWidgets.QGroupBox("Electrode Configuration")
+        # Montage Visualizer Configuration
+        config_group = QtWidgets.QGroupBox("Montage Visualizer Configuration")
         config = QtWidgets.QGridLayout(config_group)
         r = 0
 
-        # Net selection
-        config.addWidget(QtWidgets.QLabel("EEG Net:"), r, 0)
-        self.electrode_net_combo = QtWidgets.QComboBox()
-        self.electrode_net_combo.setMinimumWidth(200)
-        config.addWidget(self.electrode_net_combo, r, 1, 1, 2)
+        # Montage-only checkbox
+        self.montage_only_checkbox = QtWidgets.QCheckBox("Show only montage electrodes (from config.json)")
+        self.montage_only_checkbox.setChecked(False)
+        config.addWidget(self.montage_only_checkbox, r, 0, 1, 4)
         r += 1
 
+        # Electrode parameters
+        config.addWidget(QtWidgets.QLabel("Electrode Diameter (mm):"), r, 0)
+        self.electrode_diameter_spin = QtWidgets.QDoubleSpinBox()
+        self.electrode_diameter_spin.setRange(1.0, 100.0)
+        self.electrode_diameter_spin.setValue(10.0)
+        self.electrode_diameter_spin.setDecimals(1)
+        config.addWidget(self.electrode_diameter_spin, r, 1)
 
-        # Electrode placement parameters
-        config.addWidget(QtWidgets.QLabel("Electrode Size:"), r, 0)
-        self.electrode_size_spin = QtWidgets.QDoubleSpinBox()
-        self.electrode_size_spin.setRange(1.0, 1000.0)
-        self.electrode_size_spin.setValue(50.0)
-        config.addWidget(self.electrode_size_spin, r, 1)
-
-        config.addWidget(QtWidgets.QLabel("Offset Distance:"), r, 2)
-        self.offset_distance_spin = QtWidgets.QDoubleSpinBox()
-        self.offset_distance_spin.setRange(0.1, 10.0)
-        self.offset_distance_spin.setValue(3.25)
-        config.addWidget(self.offset_distance_spin, r, 3)
+        config.addWidget(QtWidgets.QLabel("Electrode Height (mm):"), r, 2)
+        self.electrode_height_spin = QtWidgets.QDoubleSpinBox()
+        self.electrode_height_spin.setRange(1.0, 50.0)
+        self.electrode_height_spin.setValue(6.0)
+        self.electrode_height_spin.setDecimals(1)
+        config.addWidget(self.electrode_height_spin, r, 3)
         r += 1
 
-        config.addWidget(QtWidgets.QLabel("Text Offset:"), r, 0)
-        self.text_offset_spin = QtWidgets.QDoubleSpinBox()
-        self.text_offset_spin.setRange(0.01, 1.0)
-        self.text_offset_spin.setValue(0.090)
-        config.addWidget(self.text_offset_spin, r, 1)
+        # Export GLB checkbox
+        self.export_glb_checkbox = QtWidgets.QCheckBox("Export GLB file for web viewing")
+        self.export_glb_checkbox.setChecked(False)
+        self.export_glb_checkbox.setToolTip("Export a GLB (glTF binary) file that can be viewed in web browsers")
+        config.addWidget(self.export_glb_checkbox, r, 0, 1, 4)
+        r += 1
 
-        config.addWidget(QtWidgets.QLabel("Scale Factor:"), r, 2)
-        self.scale_factor_spin = QtWidgets.QDoubleSpinBox()
-        self.scale_factor_spin.setRange(0.001, 10.0)
-        self.scale_factor_spin.setValue(1.0)
-        config.addWidget(self.scale_factor_spin, r, 3)
+        # Info label
+        info_label = QtWidgets.QLabel(
+            "This mode creates a publication-ready Blender scene (.blend) with:\n"
+            "• Scalp and gray matter surfaces\n"
+            "• Electrode placements from simulation config.json\n"
+            "• Optimized render settings\n\n"
+            "Output directory: derivatives/ti-toolbox/visual_exports/sub-{subject_id}/montage_publication/"
+        )
+        info_label.setWordWrap(True)
+        info_label.setStyleSheet("color: #555; font-size: 9pt; padding: 10px; background-color: #f0f0f0; border-radius: 5px;")
+        config.addWidget(info_label, r, 0, 1, 4)
 
         outer.addWidget(config_group)
         outer.addStretch()
@@ -485,7 +507,7 @@ class VisualExporterWidget(QtWidgets.QWidget):
         try:
             self.subjects_list = self.pm.list_subjects()
             for subject_id in self.subjects_list:
-                sim_dir = self.pm.get_subject_dir(subject_id)
+                sim_dir = self.pm.path_optional("simnibs_subject", subject_id=subject_id)
                 if sim_dir:
                     s = self.pm.list_simulations(subject_id)
                     self.simulations_dict[subject_id] = s
@@ -497,16 +519,80 @@ class VisualExporterWidget(QtWidgets.QWidget):
         except Exception as e:
             self._update_output(f"Error loading subjects: {str(e)}", 'error')
 
+    def _refresh_all(self):
+        """Refresh all dynamic content (subjects, simulations, regions)"""
+        if not self.pm:
+            self._update_output("Warning: Path manager not available", 'warning')
+            return
+
+        try:
+            # Store current selections
+            current_subject = self.subject_combo.currentText()
+            current_simulation = self.simulation_combo.currentText()
+
+            # Reload subjects and simulations
+            self._update_output("Refreshing data...", 'info')
+            self.subjects_list = []
+            self.simulations_dict = {}
+
+            self.subjects_list = self.pm.list_subjects()
+            for subject_id in self.subjects_list:
+                sim_dir = self.pm.path_optional("simnibs_subject", subject_id=subject_id)
+                if sim_dir:
+                    s = self.pm.list_simulations(subject_id)
+                    self.simulations_dict[subject_id] = s
+
+            # Update subject combo
+            self.subject_combo.blockSignals(True)  # Prevent triggering changed signal
+            self.subject_combo.clear()
+            self.subject_combo.addItems(self.subjects_list)
+
+            # Restore previous subject selection if still exists
+            if current_subject and current_subject in self.subjects_list:
+                self.subject_combo.setCurrentText(current_subject)
+            elif self.subjects_list:
+                self.subject_combo.setCurrentIndex(0)
+                current_subject = self.subjects_list[0]
+
+            self.subject_combo.blockSignals(False)
+
+            # Update simulation combo
+            if current_subject:
+                self.simulation_combo.clear()
+                sims = self.simulations_dict.get(current_subject, [])
+                self.simulation_combo.addItems(sims)
+
+                # Restore previous simulation selection if still exists
+                if current_simulation and current_simulation in sims:
+                    self.simulation_combo.setCurrentText(current_simulation)
+                elif sims:
+                    self.simulation_combo.setCurrentIndex(0)
+
+            # Refresh regions list for STL mode
+            self._refresh_regions()
+
+            # Update sub-cortical NIfTI path
+            if current_subject and hasattr(self, 'subcort_nifti_edit'):
+                m2m_dir = self.pm.path_optional("m2m", subject_id=current_subject)
+                if m2m_dir and os.path.isdir(m2m_dir):
+                    default_path = str(Path(m2m_dir) / "segmentation" / "labeling.nii.gz")
+                    self.subcort_nifti_edit.setText(default_path)
+                    self.subcort_nifti_edit.setPlaceholderText(default_path)
+
+            self._update_output(f"Refreshed: {len(self.subjects_list)} subjects loaded", 'success')
+
+        except Exception as e:
+            self._update_output(f"Error refreshing data: {str(e)}", 'error')
+
     def _on_subject_changed(self, subject_id):
         self.simulation_combo.clear()
         sims = self.simulations_dict.get(subject_id, [])
         self.simulation_combo.addItems(sims)
         self._refresh_regions()
-        self._refresh_electrode_nets(subject_id)
         # Set default sub-cortical NIfTI path
         if self.pm and subject_id and hasattr(self, 'subcort_nifti_edit'):
-            m2m_dir = self.pm.get_m2m_dir(subject_id)
-            if m2m_dir:
+            m2m_dir = self.pm.path_optional("m2m", subject_id=subject_id)
+            if m2m_dir and os.path.isdir(m2m_dir):
                 default_path = str(Path(m2m_dir) / "segmentation" / "labeling.nii.gz")
                 self.subcort_nifti_edit.setText(default_path)
                 self.subcort_nifti_edit.setPlaceholderText(default_path)
@@ -578,18 +664,6 @@ class VisualExporterWidget(QtWidgets.QWidget):
             # GUI operations may fail during widget destruction
             pass
 
-    def _refresh_electrode_nets(self, subject_id):
-        """Refresh the electrode net combo box based on selected subject."""
-        try:
-            self.electrode_net_combo.clear()
-            if not self.pm:
-                return
-            nets = self.pm.list_eeg_caps(subject_id)
-            self.electrode_net_combo.addItems(nets)
-            if not nets:
-                self._update_output(f"Warning: No EEG nets found for subject {subject_id}", 'warning')
-        except Exception as e:
-            self._update_output(f"Error loading electrode nets: {str(e)}", 'error')
 
     def _browse_tdcs_into(self, line_edit: QtWidgets.QLineEdit):
         # Default to current simulation directory
@@ -604,8 +678,8 @@ class VisualExporterWidget(QtWidgets.QWidget):
         # Default to m2m segmentation directory
         subject_id = self.subject_combo.currentText().strip()
         if self.pm and subject_id:
-            m2m_dir = self.pm.get_m2m_dir(subject_id)
-            if m2m_dir:
+            m2m_dir = self.pm.path_optional("m2m", subject_id=subject_id)
+            if m2m_dir and os.path.isdir(m2m_dir):
                 init_dir = str(Path(m2m_dir) / "segmentation")
             else:
                 init_dir = ""
@@ -630,8 +704,8 @@ class VisualExporterWidget(QtWidgets.QWidget):
         # Find the labeling_LUT.txt file
         lut_path = None
         if self.pm:
-            m2m_dir = self.pm.get_m2m_dir(subject_id)
-            if m2m_dir:
+            m2m_dir = self.pm.path_optional("m2m", subject_id=subject_id)
+            if m2m_dir and os.path.isdir(m2m_dir):
                 potential_path = Path(m2m_dir) / "segmentation" / "labeling_LUT.txt"
                 if potential_path.exists():
                     lut_path = potential_path
@@ -747,7 +821,7 @@ class VisualExporterWidget(QtWidgets.QWidget):
     def _simulation_dir(self, subject_id: str, simulation_name: str):
         if not self.pm:
             return None
-        return self.pm.get_simulation_dir(subject_id, simulation_name)
+        return self.pm.path_optional("simulation", subject_id=subject_id, simulation_name=simulation_name)
 
     def _visual_exports_dir(self, subject_id: str, simulation_name: str):
         project_dir = self._get_project_dir()
@@ -776,25 +850,10 @@ class VisualExporterWidget(QtWidgets.QWidget):
         os.makedirs(out_base, exist_ok=True)
         return out_base
 
-    def _electrode_exports_dir(self, subject_id: str):
-        """Create electrode exports directory for a subject."""
-        project_dir = self._get_project_dir()
-        if not project_dir:
-            return None
-        out_base = os.path.join(
-            project_dir,
-            const.DIR_DERIVATIVES,
-            const.DIR_TI_TOOLBOX,
-            "visual_exports/",
-            f"{const.PREFIX_SUBJECT}{subject_id}/electrode_exports",
-        )
-        os.makedirs(out_base, exist_ok=True)
-        return out_base
-
     def _m2m_dir(self, subject_id: str):
         if not self.pm:
             return None
-        return self.pm.get_m2m_dir(subject_id)
+        return self.pm.path_optional("m2m", subject_id=subject_id)
 
     # Surface mesh ensuring and caching
     def _ensure_central_surface(self, subject_id: str, simulation_name: str) -> str:
@@ -802,12 +861,10 @@ class VisualExporterWidget(QtWidgets.QWidget):
         if not m2m_dir:
             raise ValueError("m2m directory not found")
         # Paths from PathManager
-        if not self.pm or not hasattr(self.pm, 'get_ti_central_surface_path') or not hasattr(self.pm, 'get_ti_mesh_path'):
-            raise ValueError("PathManager does not provide TI mesh path helpers")
-        central_path = self.pm.get_ti_central_surface_path(subject_id, simulation_name)
-        ti_mesh_path = self.pm.get_ti_mesh_path(subject_id, simulation_name)
-        if not central_path or not ti_mesh_path:
-            raise ValueError("Unable to resolve TI mesh paths from PathManager")
+        if not self.pm:
+            raise ValueError("PathManager not available")
+        central_path = self.pm.path("ti_central_surface", subject_id=subject_id, simulation_name=simulation_name)
+        ti_mesh_path = self.pm.path("ti_mesh", subject_id=subject_id, simulation_name=simulation_name)
         surfaces_dir = os.path.dirname(central_path)
         os.makedirs(surfaces_dir, exist_ok=True)
         if os.path.exists(central_path):
@@ -836,78 +893,6 @@ class VisualExporterWidget(QtWidgets.QWidget):
                 pass
         return central_path if os.path.exists(central_path) else produced
 
-    # Electrode placement
-    def _place_electrodes(self, subject_id: str, net_name: str, 
-                          use_existing_stl: bool = False) -> None:
-        """Place electrodes on scalp using ElectrodePlacer class.
-        
-        Args:
-            subject_id: Subject identifier
-            net_name: EEG net CSV filename
-            use_existing_stl: If True, use existing scalp.stl; otherwise extract from .msh
-        """
-        # Build paths
-        eeg_pos_dir = self.pm.get_eeg_positions_dir(subject_id)
-        csv_path = os.path.join(eeg_pos_dir, net_name)
-        electrode_blend_path = os.path.join(ti_toolbox_path, "blender", "Electrode.blend")
-        output_dir = self._electrode_exports_dir(subject_id)
-        
-        m2m_dir = self._m2m_dir(subject_id)
-        
-        # Determine scalp source
-        subject_msh_path = None
-        scalp_stl_path = None
-        
-        if use_existing_stl:
-            # Try to use existing scalp.stl
-            existing_stl = os.path.join(m2m_dir, "scalp.stl")
-            if os.path.exists(existing_stl):
-                scalp_stl_path = existing_stl
-                self._update_output(f"Using existing scalp STL: {existing_stl}", 'info')
-            else:
-                # Fall back to MSH extraction
-                self._update_output("No existing scalp.stl found, extracting from MSH...", 'info')
-                subject_msh_path = os.path.join(m2m_dir, f"{subject_id}.msh")
-        else:
-            # Extract from MSH file
-            subject_msh_path = os.path.join(m2m_dir, f"{subject_id}.msh")
-        
-        # Validate source exists
-        if subject_msh_path and not os.path.exists(subject_msh_path):
-            raise FileNotFoundError(f"Subject mesh not found: {subject_msh_path}")
-
-        # Create configuration
-        config = ElectrodePlacementConfig(
-            subject_id=subject_id,
-            electrode_csv_path=csv_path,
-            electrode_blend_path=electrode_blend_path,
-            output_dir=output_dir,
-            subject_msh_path=subject_msh_path,
-            scalp_stl_path=scalp_stl_path,
-            scale_factor=self.scale_factor_spin.value(),
-            electrode_size=self.electrode_size_spin.value(),
-            offset_distance=self.offset_distance_spin.value(),
-            text_offset=self.text_offset_spin.value()
-        )
-
-        # Create placer and execute
-        try:
-            placer = ElectrodePlacer(config, logger=self.logger)
-            self._update_output(f"Placing electrodes using {net_name}…", 'info')
-
-            success, message = placer.place_electrodes()
-
-            if success:
-                self._update_output(f"\n✓ Electrode placement saved to:", 'success')
-                self._update_output(f"  {output_dir}", 'info')
-            else:
-                raise RuntimeError(message)
-
-        except Exception as e:
-            if self.logger:
-                self.logger.error(f"Electrode placement failed: {e}")
-            raise
-
     # Vector mesh autodetect
     def _autodetect_tdcs_pair(self, subject_id: str, simulation_name: str):
         sim_dir = self._simulation_dir(subject_id, simulation_name)
@@ -926,10 +911,17 @@ class VisualExporterWidget(QtWidgets.QWidget):
         subject_id = self.subject_combo.currentText().strip()
         simulation_name = self.simulation_combo.currentText().strip()
 
-        # Simulation is only required for STL and vectors modes
-        if self.rb_electrodes.isChecked() or self.rb_subcortical.isChecked():
+        # Input validation:
+        # - Sub-cortical export: subject only
+        # - Montage visualizer: subject + simulation (needs config.json under the simulation)
+        # - STL / vectors: subject + simulation
+        if self.rb_subcortical.isChecked():
             if not subject_id:
                 QtWidgets.QMessageBox.warning(self, "Missing Input", "Please select subject.")
+                return
+        elif self.rb_electrodes.isChecked():
+            if not subject_id or not simulation_name:
+                QtWidgets.QMessageBox.warning(self, "Missing Input", "Please select subject and simulation.")
                 return
         else:
             if not subject_id or not simulation_name:
@@ -940,45 +932,55 @@ class VisualExporterWidget(QtWidgets.QWidget):
             QtWidgets.QMessageBox.warning(self, "Missing Project", "Project directory not found.")
             return
 
-        # For electrode and sub-cortical modes, use subject directory instead of simulation-specific directory
-        if self.rb_electrodes.isChecked() or self.rb_subcortical.isChecked():
-            if self.rb_electrodes.isChecked():
-                out_base = self._electrode_exports_dir(subject_id)
-            else:  # sub-cortical
-                out_base = self._visual_exports_dir(subject_id, None)  # No simulation for sub-cortical
-        else:
+        # For sub-cortical mode, use subject directory instead of simulation-specific directory
+        if self.rb_subcortical.isChecked():
+            out_base = self._visual_exports_dir(subject_id, None)  # No simulation for sub-cortical
+            if not out_base:
+                QtWidgets.QMessageBox.warning(self, "Output Error", "Could not create output directory.")
+                return
+        elif not self.rb_electrodes.isChecked():
             out_base = self._visual_exports_dir(subject_id, simulation_name)
+            if not out_base:
+                QtWidgets.QMessageBox.warning(self, "Output Error", "Could not create output directory.")
+                return
+        else:
+            # Montage visualizer mode - output directory handled by montage_publication
+            out_base = None
 
-        if not out_base:
-            QtWidgets.QMessageBox.warning(self, "Output Error", "Could not create output directory.")
-            return
-
-        # Setup logger with timestamp - follows project convention: logs/sub-{subject_id}/
+        # Setup logger with timestamp - follows project convention: log/sub-{subject_id}/
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        log_dir = os.path.join(project_dir, const.DIR_DERIVATIVES, const.DIR_TI_TOOLBOX, "logs", f"sub-{subject_id}")
+        log_dir = os.path.join(project_dir, const.DIR_DERIVATIVES, const.DIR_TI_TOOLBOX, const.DIR_LOGS, f"sub-{subject_id}")
         os.makedirs(log_dir, exist_ok=True)
 
         if self.rb_electrodes.isChecked():
-            log_file = os.path.join(log_dir, f"electrode_placement_{timestamp}.log")
+            log_file = os.path.join(log_dir, f"is_blender_montage_{timestamp}.log")
         elif self.rb_subcortical.isChecked():
-            log_file = os.path.join(log_dir, f"subcortical_export_{timestamp}.log")
+            log_file = os.path.join(log_dir, f"is_blender_subcortical_{timestamp}.log")
         else:
-            log_file = os.path.join(log_dir, f"visual_exporter_{simulation_name}_{timestamp}.log")
+            log_file = os.path.join(log_dir, f"is_blender_{simulation_name}_{timestamp}.log")
 
-        # Create logger that only writes to file (no console output)
+        # Create logger with file handler and GUI console callback handler
+        from tit.logger import CallbackHandler
+
+        # Create base logger with file output only
         self.logger = get_logger("visual_exporter", log_file=log_file, overwrite=True, console=False)
 
-        # Show log file location in GUI
-        self._update_output(f"Log file: {log_file}", 'info')
+        # Add GUI console callback handler for real-time output in GUI
+        gui_handler = CallbackHandler(self._update_output)
+        gui_handler.setLevel(logging.INFO)  # Show INFO and above in GUI console
+        # Use simple format for GUI (no timestamp/level prefix - that's added by console widget)
+        gui_handler.setFormatter(logging.Formatter('%(message)s'))
+        self.logger.addHandler(gui_handler)
 
-        self.logger.info(f"=== 3D Visual Exporter - {EXTENSION_NAME} ===")
-        self.logger.info(f"Timestamp: {timestamp}")
-        self.logger.info(f"Subject: {subject_id}")
-        if simulation_name:
-            self.logger.info(f"Simulation: {simulation_name}")
-        self.logger.info(f"Output directory: {out_base}")
-        self.logger.info(f"Log file: {log_file}")
-        self.logger.info("")
+        # Ensure file handler captures everything (DEBUG level)
+        self.logger.setLevel(logging.DEBUG)
+
+        # Log header (in file only, not in GUI console)
+        # Use debug level so it doesn't appear in GUI console
+        self.logger.debug(f"=== 3D Visual Exporter - {EXTENSION_NAME} ===")
+        self.logger.debug(f"Timestamp: {timestamp}")
+        self.logger.debug(f"Log file: {log_file}")
+        self.logger.debug("")
 
         try:
             commands = []
@@ -1121,56 +1123,36 @@ class VisualExporterWidget(QtWidgets.QWidget):
                 commands.append((cmd, None))
 
             elif self.rb_electrodes.isChecked():
-                # Electrode placement mode - runs synchronously (not via worker thread)
-                self.logger.info("=== Electrode Placement Mode ===")
-                
-                # Check if Blender is available
-                blender_available = any(shutil.which(cmd) for cmd in ["blender", "simnibs_blender"])
-                if not blender_available:
-                    raise ValueError(
-                        "Blender is not installed by default. Electrode placement feature requires Blender.\n"
-                        "Install Blender by running: bash tit/blender/install_blender_docker.sh\n"
-                    )
-                
-                net_name = self.electrode_net_combo.currentText().strip()
+                # Montage Visualizer mode:
+                # Run the same CLI entrypoint in a subprocess so the GUI never blocks,
+                # and stream output exactly like the other tabs.
+                self.logger.info("=== Montage Visualizer Mode ===")
 
-                if not net_name:
-                    raise ValueError("Please select an EEG net")
+                montage_only = self.montage_only_checkbox.isChecked()
+                electrode_diameter_mm = self.electrode_diameter_spin.value()
+                electrode_height_mm = self.electrode_height_spin.value()
+                export_glb = self.export_glb_checkbox.isChecked()
 
-                self.logger.info(f"EEG Net: {net_name}")
+                cmd = [
+                    "simnibs_python",
+                    str(ti_toolbox_path / "cli" / "vis_blender.py"),
+                    "--sub",
+                    subject_id,
+                    "--sim",
+                    simulation_name,
+                    "--electrode-diameter-mm",
+                    str(electrode_diameter_mm),
+                    "--electrode-height-mm",
+                    str(electrode_height_mm),
+                ]
+                if montage_only:
+                    cmd.append("--montage-only")
+                if export_glb:
+                    cmd.append("--export-glb")
 
-                # Place electrodes (always extract fresh scalp STL from MSH)
-                self.logger.info("Placing electrodes...")
-                # Suppress stdout/stderr during electrode placement to avoid Blender output
-                import sys
-                import io
-                from contextlib import redirect_stdout, redirect_stderr
-
-                # Capture stdout and stderr
-                stdout_capture = io.StringIO()
-                stderr_capture = io.StringIO()
-
-                try:
-                    with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
-                        self._place_electrodes(subject_id, net_name, use_existing_stl=False)
-                finally:
-                    # Log any captured output to the file logger (not console)
-                    stdout_content = stdout_capture.getvalue()
-                    stderr_content = stderr_capture.getvalue()
-                    if stdout_content.strip():
-                        self.logger.debug(f"Electrode placement stdout: {stdout_content}")
-                    if stderr_content.strip():
-                        self.logger.debug(f"Electrode placement stderr: {stderr_content}")
-
-                # Electrode mode completes immediately (no worker thread needed)
-                self.logger.info("")
-                self.logger.info("========================================")
-                self.logger.info("EXPORT COMPLETE")
-                self.logger.info("========================================")
-                self._update_output("\n========================================", 'success')
-                self._update_output("EXPORT COMPLETE", 'success')
-                self._update_output("========================================", 'success')
-                return  # Exit early for electrode mode
+                self.logger.info("Starting montage visualizer subprocess...")
+                self.logger.debug("Command: %s", " ".join(cmd))
+                commands.append((cmd, None))
 
             elif self.rb_subcortical.isChecked():
                 # Sub-cortical mesh export mode - runs synchronously using Python functions
@@ -1181,8 +1163,8 @@ class VisualExporterWidget(QtWidgets.QWidget):
                 if not nifti_path:
                     # Use default path
                     if self.pm:
-                        m2m_dir = self.pm.get_m2m_dir(subject_id)
-                        if m2m_dir:
+                        m2m_dir = self.pm.path_optional("m2m", subject_id=subject_id)
+                        if m2m_dir and os.path.isdir(m2m_dir):
                             nifti_path = str(Path(m2m_dir) / "segmentation" / "labeling.nii.gz")
                         else:
                             raise ValueError("Could not determine default NIfTI path. Please specify manually.")
@@ -1307,8 +1289,9 @@ class VisualExporterWidget(QtWidgets.QWidget):
                 self.logger.warning("No commands to execute")
                 self._update_output("No export operations selected", 'warning')
         except Exception as e:
-            self._update_output(str(e), 'error')
-            QtWidgets.QMessageBox.critical(self, "Run Error", str(e))
+            # Error already logged by the specific mode handler
+            # Just show error dialog
+            QtWidgets.QMessageBox.critical(self, "Export Error", f"{str(e)}\n\nSee log file for details.")
 
     def _start_worker(self, commands):
         if hasattr(self, 'console_widget') and self.console_widget:

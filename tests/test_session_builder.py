@@ -33,10 +33,17 @@ def mock_path_manager(tmp_path):
         def __init__(self):
             self.project_dir = str(tmp_path)
 
-        def get_m2m_dir(self, subject_id):
+        def path(self, key: str, /, **kwargs):
+            subject_id = str(kwargs.get("subject_id", ""))
             m2m_path = tmp_path / "derivatives" / "SimNIBS" / f"sub-{subject_id}" / f"m2m_{subject_id}"
-            m2m_path.mkdir(parents=True, exist_ok=True)
-            return str(m2m_path)
+            if key == "m2m":
+                m2m_path.mkdir(parents=True, exist_ok=True)
+                return str(m2m_path)
+            if key == "eeg_positions":
+                eeg_dir = m2m_path / "eeg_positions"
+                eeg_dir.mkdir(parents=True, exist_ok=True)
+                return str(eeg_dir)
+            raise KeyError(f"Unsupported key in MockPathManager: {key}")
 
     return MockPathManager()
 
@@ -61,7 +68,7 @@ def setup_test_files(tmp_path, mock_path_manager):
     eeg_dir.mkdir(exist_ok=True)
 
     # Create dummy EEG cap file
-    eeg_cap = eeg_dir / "EGI_template.csv"
+    eeg_cap = eeg_dir / "GSN-HydroCel-185"
     eeg_cap.write_text("Label,X,Y,Z\nCz,0,0,100\nOz,0,-50,50\n")
 
     return {
@@ -172,7 +179,7 @@ class TestSessionBuilderTIMode:
             conductivity_type=ConductivityType.DIR,
             intensities=IntensityConfig(),
             electrode=ElectrodeConfig(),
-            eeg_net="EGI_template.csv"
+            eeg_net="GSN-HydroCel-185"
         )
 
         montage = MontageConfig(
@@ -184,7 +191,7 @@ class TestSessionBuilderTIMode:
         builder = SessionBuilder(config)
         session = builder.build_session(montage, "/output/dir")
 
-        assert session.eeg_cap.endswith("EGI_template.csv")
+        assert session.eeg_cap.endswith("GSN-HydroCel-185")
         assert "eeg_positions" in session.eeg_cap
 
     @patch('tit.sim.session_builder.get_path_manager')

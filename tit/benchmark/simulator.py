@@ -23,6 +23,7 @@ from tit.benchmark.core import (
 )
 from tit.benchmark.logger import BenchmarkLogger, create_benchmark_log_file
 from tit.benchmark.config import BenchmarkConfig, merge_config_with_args
+from tit.core import get_path_manager
 
 
 def select_electrodes(m2m_dir: Path, eeg_net: str, sim_mode: str, logger):
@@ -99,7 +100,9 @@ def create_montage_config(project_dir: Path, montage_name: str, electrodes: list
         logger: Logger instance
     """
     # Determine montage file path
-    montage_file = project_dir / "code" / "tit" / "config" / "montage_list.json"
+    pm = get_path_manager()
+    pm.project_dir = str(project_dir)
+    montage_file = Path(pm.path("montage_config"))
     
     if not montage_file.exists():
         logger.warning(f"Montage file not found: {montage_file}")
@@ -309,7 +312,7 @@ def main():
     sim_mode = str(merged.get('sim_mode', 'U'))
     conductivity = str(merged.get('conductivity', 'scalar'))
     current = str(merged.get('current', '0.002,0.002'))
-    eeg_net = str(merged.get('eeg_net', 'EGI_template.csv'))
+    eeg_net = str(merged.get('eeg_net', 'GSN-HydroCel-185.csv'))
     electrode_shape = str(merged.get('electrode_shape', 'rect'))
     dimensions = str(merged.get('dimensions', '50,50'))
     thickness = str(merged.get('thickness', '5'))

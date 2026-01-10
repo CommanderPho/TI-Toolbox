@@ -8,6 +8,7 @@ to be mocked for headless GUI testing.
 
 import sys
 from unittest.mock import MagicMock
+import pytest
 
 def pytest_configure(config):
     """Configure minimal mocking for headless testing"""
@@ -41,3 +42,16 @@ def pytest_configure(config):
 
     # Mock seaborn to avoid complex matplotlib dependencies
     sys.modules['seaborn'] = MagicMock()
+
+    sys.modules.setdefault("bpy", MagicMock())
+
+
+@pytest.fixture(autouse=True)
+def _reset_path_manager_singleton():
+    # PathManager is a singleton; tests patch PROJECT_DIR across cases.
+    try:
+        from tit.core import reset_path_manager
+
+        reset_path_manager()
+    except Exception:
+        pass

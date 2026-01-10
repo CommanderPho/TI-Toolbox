@@ -17,7 +17,7 @@ PROJECT_DIR="/mnt/test_projectdir"
 export PROJECT_DIR_NAME=$(basename "$PROJECT_DIR")
 
 # Create montage configuration for the test
-CONFIG_DIR="$PROJECT_DIR/code/tit/config"
+CONFIG_DIR="$PROJECT_DIR/code/ti-toolbox/config"
 MONTAGE_FILE="$CONFIG_DIR/montage_list.json"
 
 # Ensure config directory exists
@@ -37,7 +37,7 @@ cat > "$MONTAGE_FILE" << 'EOF'
       },
       "multi_polar_montages": {}
     },
-    "EGI_template.csv": {
+    "GSN-HydroCel-185": {
       "uni_polar_montages": {},
       "multi_polar_montages": {}
     }
@@ -89,13 +89,20 @@ echo "  Electrode Shape: $ELECTRODE_SHAPE"
 echo "  Dimensions: $DIMENSIONS mm"
 echo "  Thickness: $THICKNESS mm"
 
+# Clean up any existing simulation directory before running
+SIM_DIR="$PROJECT_DIR/derivatives/SimNIBS/sub-$SUBJECT/Simulations"
+if [ -d "$SIM_DIR" ]; then
+    echo "Cleaning up existing simulations directory: $SIM_DIR"
+    rm -rf "$SIM_DIR"
+fi
+
 # Run simulator in non-interactive mode with proper arguments
-"$SIM_CMD" "$SIM_ARGS" run \
-    --subject "$SUBJECT" \
-    --montage "$MONTAGE" \
-    --eeg-net "$EEG_NET" \
+"$SIM_CMD" "$SIM_ARGS" \
+    --sub "$SUBJECT" \
+    --montages "$MONTAGE" \
+    --eeg "$EEG_NET" \
     --conductivity "$CONDUCTIVITY" \
     --intensity "$INTENSITY" \
-    --shape "$ELECTRODE_SHAPE" \
+    --electrode-shape "$ELECTRODE_SHAPE" \
     --dimensions "$DIMENSIONS" \
     --thickness "$THICKNESS"

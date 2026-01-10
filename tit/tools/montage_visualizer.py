@@ -18,6 +18,8 @@ import subprocess
 from pathlib import Path
 from typing import List, Tuple, Optional, Dict
 
+from tit.core import get_path_manager
+
 
 class ResourcePathManager:
     """
@@ -56,7 +58,7 @@ class ResourcePathManager:
         Get the coordinate file path for a specific EEG net.
 
         Args:
-            eeg_net: Name of the EEG net (e.g., "EGI_template.csv")
+            eeg_net: Name of the EEG net (e.g., "GSN-HydroCel-185.csv")
 
         Returns:
             Path to coordinate CSV file, or None for freehand/flex modes or explicitly unsupported nets.
@@ -79,9 +81,9 @@ class ResourcePathManager:
 
         # GSN-HD compatible nets
         gsn_hd_nets = [
-            "EGI_template.csv",
             "GSN-HydroCel-185.csv",
-            "GSN-HydroCel-256.csv"
+            "GSN-HydroCel-256.csv",
+            "GSN-HydroCel-185"  # Legacy alias for GSN-HydroCel-185
         ]
 
         # 10-10 system nets
@@ -112,11 +114,11 @@ class ResourcePathManager:
             Path to template PNG image
         """
         gsn_hd_nets = [
-            "EGI_template.csv",
             "GSN-HydroCel-185.csv",
-            "GSN-HydroCel-256.csv"
+            "GSN-HydroCel-256.csv",
+            "GSN-HydroCel-185"  # Legacy alias for GSN-HydroCel-185
         ]
-        
+
         # All nets use the same GSN-256 template image
         return os.path.join(self.resources_dir, "GSN-256.png")
     
@@ -569,7 +571,7 @@ def main():
         '--eeg-net',
         '-e',
         required=True,
-        help='EEG net name (e.g., EGI_template.csv)'
+        help='EEG net name (e.g., GSN-HydroCel-185.csv)'
     )
     
     parser.add_argument(
@@ -627,11 +629,13 @@ def main():
     if args.montage_file is None:
         project_dir_name = args.project_dir_name or os.environ.get('PROJECT_DIR_NAME')
         if project_dir_name:
-            args.montage_file = f"/mnt/{project_dir_name}/code/tit/config/montage_list.json"
+            pm = get_path_manager()
+            pm.project_dir = f"/mnt/{project_dir_name}"
+            args.montage_file = pm.path("montage_config")
         else:
             # Try development mode
-            if os.path.isfile("/development/tit/config/montage_list.json"):
-                args.montage_file = "/development/tit/config/montage_list.json"
+            if os.path.isfile("/development/ti-toolbox/config/montage_list.json"):
+                args.montage_file = "/development/ti-toolbox/config/montage_list.json"
             else:
                 args.montage_file = "/tit/config/montage_list.json"
     

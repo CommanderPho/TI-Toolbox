@@ -753,7 +753,7 @@ class SimulatorTab(QtWidgets.QWidget):
             
             # If no nets found, add default
             if self.eeg_net_combo.count() == 0:
-                self.eeg_net_combo.addItem("EGI_template.csv")
+                self.eeg_net_combo.addItem("GSN-HydroCel-185.csv")
             
         except Exception as e:
             print(f"Error listing subjects: {str(e)}")
@@ -789,8 +789,8 @@ class SimulatorTab(QtWidgets.QWidget):
             current_subject = selected_subjects[0]
             
             # Get stim_configs directory
-            m2m_dir = self.pm.get_m2m_dir(current_subject)
-            if not m2m_dir:
+            m2m_dir = self.pm.path_optional("m2m", subject_id=current_subject)
+            if not m2m_dir or not os.path.isdir(m2m_dir):
                 placeholder = QtWidgets.QListWidgetItem("No subject m2m directory found")
                 placeholder.setFlags(placeholder.flags() & ~QtCore.Qt.ItemIsSelectable)
                 self.montage_list.addItem(placeholder)
@@ -853,19 +853,10 @@ class SimulatorTab(QtWidgets.QWidget):
             if not selected_subjects:
                 return
             
-            # Get simnibs directory using path manager
-            simnibs_dir = self.pm.get_simnibs_dir()
-            
-            if os.path.exists(simnibs_dir):
-                # Iterate through selected subject directories only
-                for subject_id in selected_subjects:
-                    subject_dir = f"sub-{subject_id}"
-                    subject_path = os.path.join(simnibs_dir, subject_dir)
-                    
-                    if os.path.exists(subject_path):
-                        flex_search_dir = os.path.join(subject_path, const.DIR_FLEX_SEARCH)
-
-                        if os.path.exists(flex_search_dir):
+            # Iterate through selected subject directories only
+            for subject_id in selected_subjects:
+                flex_search_dir = self.pm.path_optional("flex_search", subject_id=subject_id)
+                if flex_search_dir and os.path.isdir(flex_search_dir):
                             # Look for search directories
                             for search_name in os.listdir(flex_search_dir):
                                 search_dir = os.path.join(flex_search_dir, search_name)
@@ -924,7 +915,7 @@ class SimulatorTab(QtWidgets.QWidget):
 
             # If no nets found, add default
             if self.flex_eeg_net_combo.count() == 0:
-                self.flex_eeg_net_combo.addItem("EGI_template.csv")
+                self.flex_eeg_net_combo.addItem("GSN-HydroCel-185.csv")
 
         except Exception as e:
             print(f"Error populating flex EEG nets: {str(e)}")
@@ -1012,7 +1003,7 @@ class SimulatorTab(QtWidgets.QWidget):
             with open(montage_file, 'r') as f:
                 montage_data = json.load(f)
             # Get the current EEG net
-            current_net = self.eeg_net_combo.currentText() or "EGI_template.csv"
+            current_net = self.eeg_net_combo.currentText() or "GSN-HydroCel-185.csv"
             # Get montages for the current net
             if "nets" in montage_data and current_net in montage_data["nets"]:
                 net_montages = montage_data["nets"][current_net]
@@ -1072,7 +1063,7 @@ class SimulatorTab(QtWidgets.QWidget):
             project_dir = self.pm.project_dir
             if not project_dir:
                 return
-            # Ensure and use the new location under code/tit/config
+            # Ensure and use the new location under code/ti-toolbox/config
             montage_file = self.ensure_montage_file_exists(project_dir)
 
             self.update_output(f"Looking for montages in: {montage_file}")
@@ -1082,7 +1073,7 @@ class SimulatorTab(QtWidgets.QWidget):
                     montage_data = json.load(f)
 
                 # Determine current EEG net
-                current_net = self.eeg_net_combo.currentText() or "EGI_template.csv"
+                current_net = self.eeg_net_combo.currentText() or "GSN-HydroCel-185.csv"
                 # Get montages for the selected mode from the new nested structure
                 is_unipolar = self.sim_mode_unipolar.isChecked()
                 montage_type = "uni_polar_montages" if is_unipolar else "multi_polar_montages"
@@ -1236,15 +1227,16 @@ class SimulatorTab(QtWidgets.QWidget):
                             continue
 
                         # Get paths
-                        flex_search_dir = self.pm.get_flex_search_dir(subject_id, search_name)
+                        flex_search_dir = self.pm.path_optional("flex_search_run", subject_id=subject_id, search_name=search_name)
+                        if not flex_search_dir:
+                            self.update_output(f"Error: flex-search folder not found for {subject_id} | {search_name}", 'error')
+                            continue
                         positions_file = os.path.join(flex_search_dir, 'electrode_positions.json')
-                        m2m_dir = self.pm.get_m2m_dir(subject_id)
-
                         # Get EEG net CSV path
-                        eeg_positions_dir = os.path.join(m2m_dir, const.DIR_EEG_POSITIONS)
-                        eeg_net_path = os.path.join(eeg_positions_dir, eeg_net)
+                        eeg_positions_dir = self.pm.path_optional("eeg_positions", subject_id=subject_id)
+                        eeg_net_path = os.path.join(eeg_positions_dir or "", eeg_net)
 
-                        if not os.path.exists(eeg_net_path):
+                        if not eeg_positions_dir or not os.path.isfile(eeg_net_path):
                             self.update_output(f"Error: EEG net file not found: {eeg_net_path}", 'error')
                             continue
 
@@ -1488,12 +1480,10 @@ class SimulatorTab(QtWidgets.QWidget):
                 
                 for montage_name in montages_to_check:
                     # Get the subject's Simulations directory
-                    subject_dir = self.pm.get_subject_dir(subject_id)
-                    if subject_dir:
-                        simulations_dir = os.path.join(subject_dir, 'Simulations')
-                        montage_dir = os.path.join(simulations_dir, montage_name)
-                        if os.path.exists(montage_dir):
-                            existing_dirs.append(f"{subject_id}/{montage_name}")
+                    simulations_dir = self.pm.path_optional("simulations", subject_id=subject_id)
+                    montage_dir = os.path.join(simulations_dir or "", montage_name)
+                    if simulations_dir and os.path.exists(montage_dir):
+                        existing_dirs.append(f"{subject_id}/{montage_name}")
             
             # If any directories exist, ask for confirmation to overwrite
             if existing_dirs:
@@ -1521,16 +1511,14 @@ class SimulatorTab(QtWidgets.QWidget):
                     
                     for montage_name in montages_to_delete:
                         # Get the subject's Simulations directory
-                        subject_dir = self.pm.get_subject_dir(subject_id)
-                        if subject_dir:
-                            simulations_dir = os.path.join(subject_dir, 'Simulations')
-                            montage_dir = os.path.join(simulations_dir, montage_name)
-                            if os.path.exists(montage_dir):
-                                try:
-                                    shutil.rmtree(montage_dir)
-                                    self.update_output(f"  Removed: {subject_id}/{montage_name}")
-                                except Exception as e:
-                                    self.update_output(f"  Warning: Could not remove {subject_id}/{montage_name}: {str(e)}", 'warning')
+                        simulations_dir = self.pm.path_optional("simulations", subject_id=subject_id)
+                        montage_dir = os.path.join(simulations_dir or "", montage_name)
+                        if simulations_dir and os.path.exists(montage_dir):
+                            try:
+                                shutil.rmtree(montage_dir)
+                                self.update_output(f"  Removed: {subject_id}/{montage_name}")
+                            except Exception as e:
+                                self.update_output(f"  Warning: Could not remove {subject_id}/{montage_name}: {str(e)}", 'warning')
             
             # Build MontageConfig objects for the simulation
             # NOTE: We will schedule per-simulation jobs (subject × montage/config).
@@ -2106,19 +2094,22 @@ class SimulatorTab(QtWidgets.QWidget):
                     if subject_flex_data:
                         try:
                             search_name = subject_flex_data[0]['search_name']
-                            flex_search_dir = self.pm.get_flex_search_dir(subject_id, search_name)
+                            flex_search_dir = self.pm.path_optional("flex_search_run", subject_id=subject_id, search_name=search_name)
+                            if not flex_search_dir:
+                                self.update_output(f"Error: flex-search folder not found for {subject_id} | {search_name}", 'error')
+                                continue
                             mapping_file = os.path.join(flex_search_dir, 'electrode_mapping.json') if flex_search_dir else None
                             
                             if mapping_file and os.path.exists(mapping_file):
                                 with open(mapping_file, 'r') as f:
                                     mapping_data = json.load(f)
-                                    eeg_net = mapping_data.get('eeg_net', 'EGI_template.csv')
+                                    eeg_net = mapping_data.get('eeg_net', 'GSN-HydroCel-185.csv')
                             else:
-                                eeg_net = 'EGI_template.csv'
+                                eeg_net = 'GSN-HydroCel-185.csv'
                         except Exception:
-                            eeg_net = 'EGI_template.csv'
+                            eeg_net = 'GSN-HydroCel-185.csv'
                     else:
-                        eeg_net = 'EGI_template.csv'
+                        eeg_net = 'GSN-HydroCel-185.csv'
                 
                 # Generate individual report for each montage for this subject
                 for montage_name in montages_to_process:
@@ -2154,7 +2145,7 @@ class SimulatorTab(QtWidgets.QWidget):
                         
                         # Add this specific subject
                         bids_subject_id = f"sub-{subject_id}"
-                        m2m_path = self.pm.get_m2m_dir(subject_id)
+                        m2m_path = self.pm.path_optional("m2m", subject_id=subject_id)
                         report_generator.add_subject(subject_id, m2m_path, 'completed')
                         
                         # Add this specific montage
@@ -2165,7 +2156,7 @@ class SimulatorTab(QtWidgets.QWidget):
                         )
                         
                         # Get expected output files for this specific combination
-                        simulations_dir = self.pm.get_simulation_dir(subject_id, f'Simulations/{montage_name}')
+                        simulations_dir = self.pm.path_optional("simulation", subject_id=subject_id, simulation_name=montage_name)
                         ti_dir = os.path.join(simulations_dir, 'TI') if simulations_dir else None
                         nifti_dir = os.path.join(ti_dir, 'niftis')
                         
@@ -2197,7 +2188,7 @@ class SimulatorTab(QtWidgets.QWidget):
             self.update_output(f"--- Generated {successful_reports}/{total_reports} individual simulation reports ---")
             
             if successful_reports > 0:
-                reports_dir = self.pm.get_reports_dir()
+                reports_dir = self.pm.path_optional("ti_reports")
                 self.update_output(f"[INFO] Reports saved in: {reports_dir}")
                 
                 # Open the reports directory instead of individual files
@@ -2602,8 +2593,7 @@ class SimulatorTab(QtWidgets.QWidget):
     def _cleanup_partial_outputs(self):
         """Remove files/directories created during a failed simulation run."""
         for subject_id in (self._current_run_subjects or []):
-            sub_root = self.pm.get_subject_dir(subject_id)
-            sim_root = os.path.join(sub_root, 'Simulations') if sub_root else None
+            sim_root = self.pm.path_optional("simulations", subject_id=subject_id)
             if not sim_root:
                 continue
             # Remove tmp directory entirely
@@ -2620,7 +2610,7 @@ class SimulatorTab(QtWidgets.QWidget):
                     shutil.rmtree(montage_dir, ignore_errors=True)
                     self.update_output(f"[CLEANUP] Removed partial montage outputs: {montage_dir}")
             # Mark log files created during this failed run as errored by renaming them
-            logs_dir = self.pm.get_logs_dir(subject_id)
+            logs_dir = self.pm.path("ti_logs", subject_id=subject_id)
             if os.path.isdir(logs_dir):
                 try:
                     for fname in list(os.listdir(logs_dir)):
@@ -2965,9 +2955,9 @@ class SimulatorTab(QtWidgets.QWidget):
         """
         try:
             # Get simulation directory using path manager
-            simulation_dir = self.pm.get_simulation_dir(subject_id, 'Simulations')
+            simulation_dir = self.pm.path_optional("simulations", subject_id=subject_id)
             
-            if not os.path.exists(simulation_dir):
+            if not simulation_dir or not os.path.isdir(simulation_dir):
                 return
             
             # Get current time
@@ -3221,8 +3211,8 @@ class AddMontageDialog(QtWidgets.QDialog):
                 return
 
             # Get SimNIBS directory using path manager
-            simnibs_dir = self.pm.get_simnibs_dir()
-            if not simnibs_dir:
+            simnibs_dir = self.pm.path_optional("simnibs")
+            if not simnibs_dir or not os.path.isdir(simnibs_dir):
                 return
 
             subject_found = False
@@ -3231,7 +3221,7 @@ class AddMontageDialog(QtWidgets.QDialog):
             for subject_dir in os.listdir(simnibs_dir):
                 if subject_dir.startswith('sub-'):
                     subject_id = subject_dir[4:]  # Remove 'sub-' prefix
-                    m2m_dir = self.pm.get_m2m_dir(subject_id)
+                    m2m_dir = self.pm.path_optional("m2m", subject_id=subject_id)
                     if m2m_dir and os.path.isdir(m2m_dir):
                         # Use LeadfieldGenerator to get electrode names (handles both formats)
                         try:

@@ -20,6 +20,8 @@ import io
 import subprocess
 from scipy.ndimage import zoom
 
+from tit.core import get_path_manager
+
 class SimulationReportGenerator:
     """Generate comprehensive HTML reports for simulation pipelines."""
     
@@ -478,7 +480,9 @@ class SimulationReportGenerator:
                 output_path = reports_dir / f"simulation_report_{timestamp}.html"
             else:
                 # Multi-subject or session report
-                reports_dir = self.project_dir / "derivatives" / "tit" / "reports"
+                pm = get_path_manager()
+                pm.project_dir = str(self.project_dir)
+                reports_dir = Path(pm.ensure_dir("ti_reports"))
                 reports_dir.mkdir(parents=True, exist_ok=True)
                 # Ensure dataset_description.json exists at reports root
                 try:
@@ -1810,7 +1814,7 @@ def create_simulation_report(project_dir, simulation_session_id=None, simulation
             generator.add_simulation_parameters(
                 params.get('conductivity_type', 'scalar'),
                 params.get('simulation_mode', 'U'),
-                params.get('eeg_net', 'EGI_template.csv'),
+                params.get('eeg_net', 'GSN-HydroCel-185.csv'),
                 params.get('intensity_ch1_ma', 0),
                 params.get('intensity_ch2_ma', 0),
                 params.get('quiet_mode', False)

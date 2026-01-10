@@ -16,10 +16,19 @@ Usage:
   simnibs_python tit/cli/vis_blender.py --subject 001 --simulation MySim
 """
 
+#!/usr/bin/env simnibs_python
 from __future__ import annotations
 
-import logging
+# Ensure tit package is importable when run as a script
+# This must happen before any tit imports
 import os
+import sys
+script_dir = os.path.dirname(os.path.abspath(__file__))
+ti_toolbox_root = os.path.dirname(os.path.dirname(script_dir))  # Go up from tit/cli/ to /ti-toolbox or /TI-toolbox
+if ti_toolbox_root not in sys.path:
+    sys.path.insert(0, ti_toolbox_root)
+
+import logging
 from datetime import datetime
 from typing import Any, Dict, Optional
 
@@ -27,7 +36,6 @@ from tit.cli.base import ArgumentDefinition, InteractivePrompt, BaseCLI
 from tit.core import get_path_manager
 from tit.core import constants as const
 from tit import logger as logging_util
-from tit.blender.montage_publication import build_montage_publication_blend
 
 
 logger = logging.getLogger("tit.cli.vis_blender")
@@ -42,12 +50,13 @@ class VisBlenderCLI(BaseCLI):
         )
 
         # Add argument definitions
-        self.add_argument(ArgumentDefinition(name="subject", type=str, help="Subject ID (e.g., 001)", required=True))
-        self.add_argument(ArgumentDefinition(name="simulation", type=str, help="Simulation name", required=True))
+        self.add_argument(ArgumentDefinition(name="subject", type=str, help="Subject ID (e.g., 001)", required=True, flags=["--subject", "--sub"]))
+        self.add_argument(ArgumentDefinition(name="simulation", type=str, help="Simulation name", required=True, flags=["--simulation", "--sim"]))
         self.add_argument(ArgumentDefinition(name="output_dir", type=str, help="Output directory (default: <project>/derivatives/ti-toolbox/sub-<id>/<sim>/)", required=False))
         self.add_argument(ArgumentDefinition(name="montage_only", type=bool, help="Only show/place electrodes that are part of the montage pairs in config.json", default=False))
         self.add_argument(ArgumentDefinition(name="electrode_diameter_mm", type=float, help="Electrode diameter in mm (default: 10.0)", default=10.0))
         self.add_argument(ArgumentDefinition(name="electrode_height_mm", type=float, help="Electrode height in mm (default: 6.0)", default=6.0))
+        self.add_argument(ArgumentDefinition(name="export_glb", type=bool, help="Export GLB file for web viewing", default=False))
         self.add_argument(ArgumentDefinition(name="verbose", type=bool, help="Verbose logging", default=False))
 
 
@@ -105,14 +114,22 @@ class VisBlenderCLI(BaseCLI):
             log.info(f"Logging to: {log_file}")
 
         try:
-            result = build_montage_publication_blend(
+            # Lazy import: Blender/SimNIBS stack is heavy; keep `--help` import-safe.
+            from tit.blender.api import (
+                MontagePublicationRequest,
+                create_montage_publication_blend,
+            )
+
+            req = MontagePublicationRequest(
                 subject_id=args["subject"],
                 simulation_name=args["simulation"],
                 output_dir=args.get("output_dir"),
                 show_full_net=(not args.get("montage_only", False)),
                 electrode_diameter_mm=args.get("electrode_diameter_mm", 10.0),
                 electrode_height_mm=args.get("electrode_height_mm", 6.0),
+                export_glb=args.get("export_glb", False),
             )
+            result = create_montage_publication_blend(req, logger=log)
 
             log.info("Done.")
             log.info(f"Scalp STL: {result.scalp_stl}")
@@ -133,11 +150,12 @@ class VisBlenderCLI(BaseCLI):
             pm.project_dir,
             const.DIR_DERIVATIVES,
             const.DIR_TI_TOOLBOX,
+            const.DIR_LOGS,
             f"{const.PREFIX_SUBJECT}{args['subject']}",
         )
         os.makedirs(logs_dir, exist_ok=True)
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        return os.path.join(logs_dir, f"vis_blender_{args['simulation']}_{ts}.log")
+        return os.path.join(logs_dir, f"is_blender_{args['simulation']}_{ts}.log")
 
 
 def _setup_logging_with_file(verbose: bool, log_file: Optional[str]) -> logging.Logger:
@@ -153,14 +171,9 @@ def _setup_logging_with_file(verbose: bool, log_file: Optional[str]) -> logging.
                 # Logger handler configuration may fail
                 pass
 
-    logging_util.configure_external_loggers(
-        names=[
-            "tit.blender.utils",
-            "tit.blender.electrode_placement",
-            "simnibs",
-        ],
-        parent_logger=log,
-    )
+    # Use shared logger configuration
+    from tit.blender.montage_publication import configure_montage_loggers
+    configure_montage_loggers(log)
     return log
 
 

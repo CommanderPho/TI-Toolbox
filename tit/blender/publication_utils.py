@@ -2,6 +2,14 @@
 """
 TI-Toolbox Publication Visual Utilities
 
+⚠️ DEPRECATED: This module is obsolete and no longer used.
+⚠️ All functionality has been moved to tit.blender.montage_publication.py
+
+This file is kept for reference only. It contains the original implementation
+that was used to develop the current centralized montage publication system.
+
+Use tit.blender.montage_publication.build_montage_publication_blend() instead.
+
 Backend utilities for creating publication-ready 3D visualizations.
 Provides functionality to export and compose scalp, electrodes, GM, and ROI
 into Blender scenes with proper transparency and electrode highlighting.
@@ -54,9 +62,9 @@ class PublicationVisualizer:
         self.pm = get_path_manager()
 
         # Setup paths using PathManager
-        self.subject_dir = self.pm.get_subject_dir(subject_id)
-        self.sim_dir = self.pm.get_simulation_dir(subject_id, simulation_name)
-        self.m2m_dir = self.pm.get_m2m_dir(subject_id)
+        self.subject_dir = self.pm.path_optional("simnibs_subject", subject_id=subject_id)
+        self.sim_dir = self.pm.path_optional("simulation", subject_id=subject_id, simulation_name=simulation_name)
+        self.m2m_dir = self.pm.path_optional("m2m", subject_id=subject_id)
 
         if not all([self.subject_dir, self.sim_dir, self.m2m_dir]):
             raise ValueError(f"Required directories not found for subject {subject_id}")

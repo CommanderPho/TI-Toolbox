@@ -84,6 +84,7 @@ except (AttributeError, OSError):
     sys.stderr.write = flushing_stderr_write
 
 from tit import logger as logging_util
+from tit.core import get_path_manager
 
 def flush_output():
     """Force flush stdout and stderr for real-time GUI updates."""
@@ -265,14 +266,15 @@ def construct_mesh_field_path(m2m_subject_path, montage_name):
     
     # Navigate up to find the project directory
     project_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(m2m_subject_path))))
-    if not project_dir.startswith('/mnt/'):
-        project_dir = f"/mnt/{os.path.basename(project_dir)}"
-    
-    # Check if mTI directory exists - if yes, this is an mTI simulation
-    mti_mesh_dir = os.path.join(project_dir, 'derivatives', 'SimNIBS', f'sub-{subject_id}', 
-                                'Simulations', montage_name, 'mTI', 'mesh')
-    ti_mesh_dir = os.path.join(project_dir, 'derivatives', 'SimNIBS', f'sub-{subject_id}', 
-                               'Simulations', montage_name, 'TI', 'mesh')
+
+    # Build expected mesh directories directly (keep this function pure: no PathManager mutation).
+    # This is used heavily in tests and utility contexts where the project dir may be synthetic.
+    mti_mesh_dir = os.path.join(
+        project_dir, "derivatives", "SimNIBS", f"sub-{subject_id}", "Simulations", montage_name, "mTI", "mesh"
+    )
+    ti_mesh_dir = os.path.join(
+        project_dir, "derivatives", "SimNIBS", f"sub-{subject_id}", "Simulations", montage_name, "TI", "mesh"
+    )
     
     # Determine if this is an mTI or TI simulation
     is_mti = os.path.exists(mti_mesh_dir)
@@ -506,13 +508,9 @@ def main():
             flush_output()
         else:
             # Use default subject-specific logging
-            # Get project directory from m2m_subject_path
-            project_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(args.m2m_subject_path))))  # Go up four levels from m2m_subject
-            if not project_dir.startswith('/mnt/'):
-                project_dir = f"/mnt/{os.path.basename(project_dir)}"
-            
-            # Create derivatives/ti-toolbox/logs/sub-* directory structure
-            log_dir = os.path.join(project_dir, 'derivatives', 'ti-toolbox', 'logs', f'sub-{subject_id}')
+            # Centralized logs dir (derivatives/ti-toolbox/logs/sub-*)
+            pm = get_path_manager()
+            log_dir = pm.path("ti_logs", subject_id=subject_id)
             os.makedirs(log_dir, exist_ok=True)
             
             # Create log file in the new directory
