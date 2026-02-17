@@ -9,17 +9,8 @@ omit =
     */benchmark/*
     */blender/*
     */gui/*
-    */pre/*
     setup.py
     version.py
-
-[paths]
-core = tit/core/
-simulator = tit/sim/
-analyzer = tit/analyzer/
-optimizer = tit/opt/
-stats = tit/stats/
-plotting = tit/plotting/
 
 [report]
 precision = 2

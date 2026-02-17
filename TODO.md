@@ -4,7 +4,8 @@ To-Do List:
 
 - [ ] continue to write unit tests and potentially integration tests
 - [ ] continue cleanup & efficiency increase 
-- [ ] docs maintenance - wiki, gallery, API (via sphinx?), etc.
+- [ ] docs maintenance - wiki, gallery, API (via MkDocs), etc.
+- [ ] clean up new qsipre/recon script to reduce over protection from development phase
 
 ### UI - Frontend
 

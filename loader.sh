@@ -1,144 +1,87 @@
 #!/bin/bash
 
-# Set script directory
-SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
+set -euo pipefail
+
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 cd "$SCRIPT_DIR"
 
-# Cache OS type to avoid multiple uname calls
 OS_TYPE=$(uname -s)
-
-# Default paths file
 DEFAULT_PATHS_FILE="$SCRIPT_DIR/.default_paths.user"
 
-# Function to load default paths
+AUTO_CREATE="false"
+PROJECT_DIR_ARG=""
+SIMNIBS_CONTAINER_NAME="simnibs_container"
+XHOST_BIN=""
+MPLBACKEND_VALUE="Qt5Agg"
+PROJECT_DIR_CREATED="false"
+PROJECT_DIR_EMPTY="false"
+X11_MARKER_NAME=".ti_toolbox_x11_initialized"
+X11_MARKER_DIR="code/ti-toolbox/config"
+set_xhost_bin() {
+  if command -v xhost >/dev/null 2>&1; then
+    XHOST_BIN="xhost"
+  elif [[ -x /opt/X11/bin/xhost ]]; then
+    XHOST_BIN="/opt/X11/bin/xhost"
+  else
+    XHOST_BIN=""
+    return 1
+  fi
+}
+
+allow_xhost() {
+  [[ -n "$XHOST_BIN" ]] || return 0
+  case "$OS_TYPE" in
+    Linux)
+      "$XHOST_BIN" + >/dev/null 2>&1 || true
+      ;;
+    Darwin)
+      DISPLAY=":0" "$XHOST_BIN" + >/dev/null 2>&1 || true
+      ;;
+  esac
+}
+
+
+die() {
+  echo "$1"
+  exit 1
+}
+
 load_default_paths() {
   if [[ -f "$DEFAULT_PATHS_FILE" ]]; then
+    # shellcheck disable=SC1090
     source "$DEFAULT_PATHS_FILE"
   fi
 }
 
-# Function to save default paths
 save_default_paths() {
-    echo "LOCAL_PROJECT_DIR=\"$LOCAL_PROJECT_DIR\"" > "$DEFAULT_PATHS_FILE"
+  echo "LOCAL_PROJECT_DIR=\"$LOCAL_PROJECT_DIR\"" > "$DEFAULT_PATHS_FILE"
 }
 
-# Function to validate and prompt for the project directory
-get_project_directory() {
-  while true; do
-    if [[ -n "$LOCAL_PROJECT_DIR" ]]; then
-      echo "Current project directory: $LOCAL_PROJECT_DIR"
-      echo "Press Enter to use this directory or enter a new path:"
-      read -r new_path
-      if [[ -z "$new_path" ]]; then
-        break
-      else
-        LOCAL_PROJECT_DIR="$new_path"
-      fi
-    else
-      echo "Give path to local project dir:"
-      read -r LOCAL_PROJECT_DIR
-    fi
-
-    # Check if directory exists
-    if [[ -d "$LOCAL_PROJECT_DIR" ]]; then
-      # Check if we have write permissions
-      if [[ ! -w "$LOCAL_PROJECT_DIR" ]]; then
-        echo "Warning: No write permissions in directory $LOCAL_PROJECT_DIR"
-        echo "The container may not function properly without write access."
-        echo "Do you want to continue anyway? (y/n)"
-        read -r response
-        if [[ "$response" != "y" ]]; then
-          continue
-        fi
-      fi
-      break
-    else
-      echo "Directory does not exist: $LOCAL_PROJECT_DIR"
-      echo "Please provide an existing directory path."
-    fi
-  done
+check_docker_available() {
+  command -v docker >/dev/null 2>&1 || die "Error: Docker is not installed or not in PATH."
+  docker info >/dev/null 2>&1 || die "Error: Docker daemon is not running. Please start Docker and try again."
+  docker compose version >/dev/null 2>&1 || die "Error: Docker Compose (v2) is not available."
 }
 
-# Function to check for macOS
-check_macos() {
-    if [[ "$(uname)" != "Darwin" ]]; then
-        return 1
-    fi
-}
-
-# Function to check XQuartz version
-check_xquartz_version() {
-    XQUARTZ_APP="/Applications/Utilities/XQuartz.app"
-    if [ ! -d "$XQUARTZ_APP" ]; then
-        return 1
-    else
-        xquartz_version=$(mdls -name kMDItemVersion "$XQUARTZ_APP" | awk -F'"' '{print $2}')
-        if [[ "$xquartz_version" > "2.8.0" ]]; then
-            return 1
-        fi
-    fi
-    return 0
-}
-
-# Function to allow connections from network clients
-allow_network_clients() {
-    defaults write org.macosforge.xquartz.X11 nolisten_tcp -bool false >/dev/null 2>&1
-    
-    # Check if XQuartz is already running
-    if ! pgrep -x "Xquartz" > /dev/null; then
-        open -a XQuartz
-        sleep 2
-    fi
-}
-
-
-# Function to set DISPLAY environment variable based on OS
-set_display_env() {
+check_x_forwarding() {
   case "$OS_TYPE" in
-  Linux)
-    # If Linux, use the existing DISPLAY (native X11)
-    export DISPLAY=${DISPLAY:-:0}
-    ;;
-  Darwin|MINGW*|MSYS*|CYGWIN*)
-    # For macOS/Windows with Docker Desktop, use host.docker.internal
-    export DISPLAY="host.docker.internal:0"
-    ;;
-  *)
-    echo "Unsupported OS for X11 display configuration."
-    exit 1
-    ;;
+    Linux)
+      export DISPLAY=${DISPLAY:-:0}
+      set_xhost_bin >/dev/null 2>&1 || die "Error: xhost is not available. Please install xhost."
+      allow_xhost
+      ;;
+    Darwin)
+      export DISPLAY="host.docker.internal:0"
+      ;;
+    MINGW*|MSYS*|CYGWIN*)
+      die "Windows GUI forwarding is not supported by this loader."
+      ;;
+    *)
+      die "Unsupported OS for X11 display configuration."
+      ;;
   esac
 }
 
-# Function to allow connections from XQuartz or X11
-allow_xhost() {
-  case "$OS_TYPE" in
-  Linux)
-    # Allow connections for Linux
-    if command -v xhost >/dev/null 2>&1; then
-      xhost +local:root >/dev/null 2>&1
-      xhost +local:docker >/dev/null 2>&1
-    fi
-    ;;
-  Darwin|MINGW*|MSYS*|CYGWIN*)
-    # For macOS/Windows with Docker Desktop, allow localhost and hostname
-    if command -v xhost >/dev/null 2>&1; then
-      xhost +localhost >/dev/null 2>&1
-      xhost +$(hostname) >/dev/null 2>&1
-    fi
-    ;;
-  esac
-}
-
-# Function to validate docker-compose.yml existence
-validate_docker_compose() {
-  if [[ ! -f "$SCRIPT_DIR/docker-compose.yml" ]]; then
-    echo "Error: docker-compose.yml not found in $SCRIPT_DIR. Please make sure the file is present."
-    exit 1
-  fi
-}
-
-# Function to display welcome message
 display_welcome() {
   echo "Welcome to the TI-Toolbox from the Center for Sleep and Consciousness"
   echo ""
@@ -146,491 +89,265 @@ display_welcome() {
   echo ""
 }
 
-# Function to ensure required Docker volumes exist
-ensure_docker_volumes() {
-  local volumes=( "ti-toolbox_freesurfer_data")
-  
-  for volume in "${volumes[@]}"; do
-    if ! docker volume inspect "$volume" >/dev/null 2>&1; then
-      docker volume create "$volume" >/dev/null 2>&1
-    fi
-  done
-}
-
-
-
-# Function to run Docker Compose and attach to simnibs container
-run_docker_compose() {
-  # Ensure volumes exist
-  ensure_docker_volumes
-
-  # Set HOME environment variable for .Xauthority access
-  export HOME=${HOME:-$USERPROFILE}
-
-  # Check if required images exist, pull only if missing
-  local images_needed=()
-  
-  # Extract image names from docker-compose.yml
-  local compose_images=$(grep -E '^\s+image:' "$SCRIPT_DIR/docker-compose.yml" | awk '{print $2}')
-  
-  # Check each required image
-  while IFS= read -r image; do
-    if [ -n "$image" ]; then
-      if ! docker images --format "{{.Repository}}:{{.Tag}}" | grep -q "^${image}$"; then
-        images_needed+=("$image")
-      fi
-    fi
-  done <<< "$compose_images"
-  
-  # Pull only if images are missing
-  if [ ${#images_needed[@]} -gt 0 ]; then
-    echo "Pulling required Docker images..."
-    docker compose -f "$SCRIPT_DIR/docker-compose.yml" pull
-  fi
-
-  # Set host machine timezone for notes and logging
-  export TZ="$(get_host_timezone)"
-
-  # Run Docker Compose
-  echo "Starting services..."
-  docker compose -f "$SCRIPT_DIR/docker-compose.yml" up --build -d
-
-  # Wait for containers to initialize
-  echo "Waiting for services to initialize..."
-  sleep 3
-
-  # Check if simnibs service is up
-  if ! docker compose ps | grep -q "simnibs"; then
-    echo "Error: simnibs service is not running. Please check your docker-compose.yml and container logs."
-    docker compose logs
-    exit 1
-  fi
-
-  # Setup example data if this is a new project
-  if [ "${NEEDS_EXAMPLE_DATA:-false}" = "true" ]; then
-    setup_example_data_in_container
-  fi
-
-  # Attach to the simnibs container with an interactive terminal
-  echo "Attaching to the simnibs_container..."
-  docker exec -ti simnibs_container bash
-
-  # Stop and remove all containers when done
-  docker compose -f "$SCRIPT_DIR/docker-compose.yml" down
-  # Stop and remove all containers when done
-
-  # Revert X server access permissions
-  case "$OS_TYPE" in
-  Linux|Darwin)
-    if command -v xhost >/dev/null 2>&1; then
-      xhost -local:root >/dev/null 2>&1
-      xhost -local:docker >/dev/null 2>&1
-    fi
-    ;;
-  esac
-}
-
-# Get current timezone from host machine (cross-platform)
 get_host_timezone() {
-  # Try different methods to get timezone name
   if command -v timedatectl >/dev/null 2>&1; then
-    # Linux with systemd
     timedatectl show --property=Timezone --value 2>/dev/null || echo "UTC"
   elif [ -L /etc/localtime ]; then
-    # macOS and some Linux systems - localtime is a symlink
-    timezone_path=$(readlink /etc/localtime 2>/dev/null | sed 's|.*/zoneinfo/||')
-    echo "${timezone_path:-UTC}"
+    readlink /etc/localtime 2>/dev/null | sed 's|.*/zoneinfo/||' || echo "UTC"
   elif command -v systemsetup >/dev/null 2>&1; then
-    # macOS alternative
     systemsetup -gettimezone 2>/dev/null | sed 's/Time Zone: //' || echo "UTC"
   else
-    # Fallback - try to get from date command
     date +%Z 2>/dev/null || echo "UTC"
   fi
 }
 
-# Get current timestamp from host machine (cross-platform)
-get_host_timestamp() {
-  # Use date command which works on all Unix-like systems and Git Bash
-  # Format: Thu Oct 30 13:57:36 CDT 2025
-  date
-}
-
-# ============================================================================
-# Host-side project initialization functions
-# ============================================================================
-
-# Function to check if project is new and needs initialization
-check_if_new_project() {
-  local project_config_dir="$LOCAL_PROJECT_DIR/code/ti-toolbox/config"
-  
-  if [ ! -d "$project_config_dir" ]; then
-    return 0  # New project
-  else
-    return 1  # Existing project
-  fi
-}
-
-# Function to create hidden files cross-platform
-create_hidden_file() {
-  local file_path="$1"
-  local content="$2"
-  
-  if [ -n "$content" ]; then
-    echo "$content" > "$file_path"
-  else
-    touch "$file_path"
-  fi
-  
-  case "$OS_TYPE" in
-    MINGW*|MSYS*|CYGWIN*)
-      attrib +h "$file_path" >/dev/null 2>&1
-      ;;
-    *)
-      # Unix-like (macOS/Linux) - files are hidden if they start with a dot
-      ;;
-  esac
-}
-
-# Function to initialize BIDS README file in the project root
-initialize_readme() {
-  local readme_file="$LOCAL_PROJECT_DIR/README"
-  
-  if [ -f "$readme_file" ]; then
-    return 0
-  fi
-
-  local project_name="$PROJECT_DIR_NAME"
-
-  cat > "$readme_file" << 'EOF'
-# PROJECT_NAME_PLACEHOLDER
-
-This is a BIDS-compliant neuroimaging dataset generated by TI-Toolbox for temporal interference (TI) stimulation modeling and analysis.
-
-## Overview
-
-This project contains structural MRI data and derivatives for simulating and analyzing temporal interference electric field patterns in the brain.
-
-## Dataset Structure
-
-- `sourcedata/` - Raw DICOM source files
-- `sub-*/` - Subject-level BIDS-formatted neuroimaging data (NIfTI files)
-- `derivatives/` - Processed data and analysis results
-  - `freesurfer/` - FreeSurfer anatomical segmentation and surface reconstructions
-  - `SimNIBS/` - SimNIBS head models and electric field simulations
-  - `tit/` - TI-Toolbox simulation results and analyses
-
-## Software
-
-Data processing and simulations were performed using:
-- **TI-Toolbox** - Temporal interference modeling pipeline
-- **FreeSurfer** - Cortical reconstruction and volumetric segmentation
-- **SimNIBS** - Finite element modeling for electric field simulations
-
-## More Information
-
-For more information about TI-Toolbox, visit:
-- GitHub: https://github.com/idossha/TI-Toolbox
-- Documentation: https://idossha.github.io/TI-toolbox/
-
-## BIDS Compliance
-
-This dataset follows the Brain Imaging Data Structure (BIDS) specification for organizing and describing neuroimaging data. For more information about BIDS, visit: https://bids.neuroimaging.io/
-EOF
-
-  # Replace placeholder with actual project name
-  if [[ "$OS_TYPE" == "Darwin" ]]; then
-    sed -i '' "s/PROJECT_NAME_PLACEHOLDER/$project_name/" "$readme_file"
-  else
-    sed -i "s/PROJECT_NAME_PLACEHOLDER/$project_name/" "$readme_file"
-  fi
-}
-
-# Function to setup example data for new projects
-setup_example_data_if_new() {
-  echo "═══════════════════════════════════════════════════════"
-  echo "DEBUG: setup_example_data_if_new() called"
-  echo "═══════════════════════════════════════════════════════"
-  
-  local toolbox_root="$SCRIPT_DIR/../.."
-  local example_data_manager="$toolbox_root/tit/new_project/example_data_manager.py"
-  
-  echo "DEBUG: SCRIPT_DIR = $SCRIPT_DIR"
-  echo "DEBUG: toolbox_root = $toolbox_root"
-  echo "DEBUG: example_data_manager = $example_data_manager"
-  echo "DEBUG: LOCAL_PROJECT_DIR = $LOCAL_PROJECT_DIR"
-  
-  # Check if the example data manager exists
-  if [ ! -f "$example_data_manager" ]; then
-    echo "ERROR: Example data manager not found at $example_data_manager"
-    echo "DEBUG: Listing directory contents:"
-    ls -la "$toolbox_root/tit/new_project/" 2>&1 || echo "Directory does not exist"
-    return 1
-  fi
-  
-  echo "DEBUG: ✓ Example data manager file found"
-  
-  # Check if Python is available (in dev mode, we're on host, not in Docker)
-  if command -v python3 >/dev/null 2>&1; then
-    echo "DEBUG: ✓ Python3 found at: $(which python3)"
-    echo "DEBUG: Python3 version: $(python3 --version)"
-    echo "Setting up example data for new project..."
-    echo "DEBUG: Running command: python3 $example_data_manager $toolbox_root $LOCAL_PROJECT_DIR"
-    
-    # Run the example data manager with verbose output
-    if python3 "$example_data_manager" "$toolbox_root" "$LOCAL_PROJECT_DIR" 2>&1; then
-      echo "✓ Example data setup completed successfully"
+get_project_directory() {
+  while true; do
+    if [[ -n "$PROJECT_DIR_ARG" ]]; then
+      LOCAL_PROJECT_DIR="$PROJECT_DIR_ARG"
+    elif [[ -n "${LOCAL_PROJECT_DIR:-}" ]]; then
+      echo "Current project directory: $LOCAL_PROJECT_DIR"
+      echo "Press Enter to use this directory or enter a new path:"
+      read -r new_path
+      if [[ -n "$new_path" ]]; then
+        LOCAL_PROJECT_DIR="$new_path"
+      fi
     else
-      local exit_code=$?
-      echo "ERROR: Example data setup failed with exit code: $exit_code"
-      echo "Continuing with project initialization..."
+      echo "Give path to local project dir:"
+      read -r LOCAL_PROJECT_DIR
     fi
-  else
-    echo "ERROR: Python3 not available in PATH"
-    echo "DEBUG: Current PATH = $PATH"
-    echo "Skipping example data setup"
-  fi
-  
-  echo "═══════════════════════════════════════════════════════"
-  echo "DEBUG: setup_example_data_if_new() completed"
-  echo "═══════════════════════════════════════════════════════"
-}
 
+    LOCAL_PROJECT_DIR="${LOCAL_PROJECT_DIR/#\~/$HOME}"
+    LOCAL_PROJECT_DIR=${LOCAL_PROJECT_DIR%$'\r'}
 
-# Function to initialize root dataset_description.json
-initialize_dataset_description() {
-  local dataset_file="$LOCAL_PROJECT_DIR/dataset_description.json"
-  
-  if [ -f "$dataset_file" ]; then
-    return 0
-  fi
+    if [[ -z "$LOCAL_PROJECT_DIR" ]]; then
+      echo "Please provide a valid directory path."
+      continue
+    fi
 
-  local project_name="$PROJECT_DIR_NAME"
-  
-  cat > "$dataset_file" << EOF
-{
-  "Name": "$project_name",
-  "BIDSVersion": "1.6.0",
-  "DatasetType": "raw",
-  "License": "",
-  "Authors": [],
-  "Acknowledgements": "",
-  "HowToAcknowledge": "",
-  "Funding": [],
-  "ReferencesAndLinks": [
-    "https://github.com/idossha/TI-Toolbox"
-  ],
-  "DatasetDOI": ""
-}
-EOF
-}
-
-# Function to initialize derivative dataset_description.json files
-initialize_derivative_dataset_description() {
-  local derivative_name="$1"
-  local derivative_dir="$LOCAL_PROJECT_DIR/derivatives/$derivative_name"
-  local dataset_file="$derivative_dir/dataset_description.json"
-  
-  if [ -f "$dataset_file" ]; then
-    return 0
-  fi
-
-  mkdir -p "$derivative_dir"
-
-  local project_name="$PROJECT_DIR_NAME"
-  local current_date=$(date +"%Y-%m-%d")
-  
-  cat > "$dataset_file" << EOF
-{
-  "Name": "$derivative_name derivatives",
-  "BIDSVersion": "1.6.0",
-  "DatasetType": "derivative",
-  "GeneratedBy": [
-    {
-      "Name": "$derivative_name"
-    }
-  ],
-  "SourceDatasets": [
-    {
-      "URI": "bids:$project_name@$current_date",
-      "Version": "1.0.0"
-    }
-  ],
-  "DatasetLinks": {
-    "$project_name": "../../"
-  }
-}
-EOF
-}
-
-# Function to initialize project status JSON
-initialize_project_status() {
-  local info_dir="$LOCAL_PROJECT_DIR/derivatives/ti-toolbox/.ti-toolbox-info"
-  local status_file="$info_dir/project_status.json"
-  
-  mkdir -p "$info_dir"
-  
-  local current_time=$(date -u +"%Y-%m-%dT%H:%M:%S")
-  
-  cat > "$status_file" << EOF
-{
-  "project_created": "$current_time",
-  "last_updated": "$current_time",
-  "config_created": true,
-  "example_data_copied": false,
-  "user_preferences": {
-    "show_welcome": true
-  },
-  "project_metadata": {
-    "name": "$PROJECT_DIR_NAME",
-    "path": "$LOCAL_PROJECT_DIR",
-    "version": "unknown"
-  }
-}
-EOF
-
-  create_hidden_file "$status_file"
-}
-
-# Function to setup example data using Docker container
-setup_example_data_in_container() {
-  local container_name="simnibs_container"
-  local container_project_dir="/mnt/$PROJECT_DIR_NAME"
-  
-  echo "Setting up example data..."
-  
-  # Wait for container to be ready
-  local max_wait=30
-  local wait_count=0
-  while ! docker ps | grep -q "$container_name"; do
-    sleep 1
-    wait_count=$((wait_count + 1))
-    if [ $wait_count -ge $max_wait ]; then
-      echo "  ⚠ Container not ready, skipping example data setup"
-      return 1
+    if [[ -d "$LOCAL_PROJECT_DIR" ]]; then
+      if [[ ! -w "$LOCAL_PROJECT_DIR" ]]; then
+        echo "Warning: No write permissions in directory $LOCAL_PROJECT_DIR"
+        echo "Do you want to continue anyway? (y/n)"
+        read -r response
+        [[ "$response" == "y" ]] || continue
+      fi
+      PROJECT_DIR_CREATED="false"
+      if [[ -z "$(ls -A "$LOCAL_PROJECT_DIR" 2>/dev/null)" ]]; then
+        PROJECT_DIR_EMPTY="true"
+      else
+        PROJECT_DIR_EMPTY="false"
+      fi
+      break
+    elif [[ -e "$LOCAL_PROJECT_DIR" ]]; then
+      echo "Path exists but is not a directory: $LOCAL_PROJECT_DIR"
+      [[ -n "$PROJECT_DIR_ARG" ]] && exit 1
+      continue
+    else
+      echo "Directory does not exist: $LOCAL_PROJECT_DIR"
+      if [[ "$AUTO_CREATE" == "true" ]]; then
+        response="y"
+      else
+        read -r -p "Create it? (y/n): " response
+      fi
+      if [[ "$response" == "y" ]]; then
+        mkdir -p "$LOCAL_PROJECT_DIR" || die "Error: Unable to create directory $LOCAL_PROJECT_DIR"
+        PROJECT_DIR_CREATED="true"
+        PROJECT_DIR_EMPTY="true"
+        break
+      fi
     fi
   done
-  
-  # Run the example data manager inside the container with correct paths
-  if docker exec "$container_name" simnibs_python /ti-toolbox/tit/new_project/example_data_manager.py /ti-toolbox "$container_project_dir"; then
-    echo "  ✓ Example data copied successfully"
-    return 0
-  else
-    echo "  ⚠ Example data setup failed"
-    return 1
+}
+
+macos_x11_marker_path() {
+  echo "${LOCAL_PROJECT_DIR%/}/$X11_MARKER_DIR/$X11_MARKER_NAME"
+}
+
+init_macos_x11_once() {
+  [[ -d "/Applications/Utilities/XQuartz.app" ]] || die "Error: XQuartz is not installed. Please install XQuartz."
+  set_xhost_bin >/dev/null 2>&1 || die "Error: xhost is not available. Please ensure XQuartz is installed correctly."
+  touch "$HOME/.Xauthority" >/dev/null 2>&1 || true
+
+  defaults write org.macosforge.xquartz.X11 nolisten_tcp -bool false >/dev/null 2>&1 || true
+
+  local xquartz_cmd
+  xquartz_cmd=$(ps -ax -o command= | grep -i '[X]quartz' | head -n 1 || true)
+  if [[ -z "$xquartz_cmd" ]]; then
+    echo "Starting XQuartz..."
+    open -a XQuartz >/dev/null 2>&1 || true
+    sleep 2
+    xquartz_cmd=$(ps -ax -o command= | grep -i '[X]quartz' | head -n 1 || true)
+  fi
+
+  [[ -n "$xquartz_cmd" ]] || die "Error: XQuartz is not running. Start it first (open -a XQuartz)."
+  if [[ "$xquartz_cmd" == *"-nolisten tcp"* ]]; then
+    die "Error: XQuartz is running with -nolisten tcp. Quit and restart XQuartz after running: defaults write org.macosforge.xquartz.X11 nolisten_tcp -bool false"
+  fi
+
+  DISPLAY=":0" "$XHOST_BIN" + >/dev/null 2>&1 || true
+}
+
+maybe_init_macos_x11() {
+  [[ "$OS_TYPE" == "Darwin" ]] || return 0
+  local marker
+  marker=$(macos_x11_marker_path)
+  if [[ "$PROJECT_DIR_CREATED" == "true" || "$PROJECT_DIR_EMPTY" == "true" || ! -f "$marker" ]]; then
+    echo "Initializing XQuartz for X11 forwarding (one-time)..."
+    init_macos_x11_once
+    mkdir -p "$(dirname "$marker")" || true
+    echo "x11_initialized=1" > "$marker"
+  fi
+  echo "XQuartz: ensure 'Allow connections from network clients' is enabled."
+}
+
+ensure_docker_volumes() {
+  if ! docker volume inspect ti-toolbox_freesurfer_data >/dev/null 2>&1; then
+    docker volume create ti-toolbox_freesurfer_data >/dev/null 2>&1 || true
   fi
 }
 
-# Main initialization function that orchestrates everything
-initialize_project_structure() {
-  echo ""
-  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  echo "  New project detected: $PROJECT_DIR_NAME"
-  echo "  Initializing BIDS-compliant structure..."
-  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  echo ""
-  
-  # Create main BIDS directories
-  echo "Creating directory structure..."
-  mkdir -p "$LOCAL_PROJECT_DIR/code/ti-toolbox/config"
-  mkdir -p "$LOCAL_PROJECT_DIR/derivatives/ti-toolbox/.ti-toolbox-info"
-  mkdir -p "$LOCAL_PROJECT_DIR/derivatives/freesurfer"
-  mkdir -p "$LOCAL_PROJECT_DIR/derivatives/SimNIBS"
-  mkdir -p "$LOCAL_PROJECT_DIR/sourcedata"
-  echo "  ✓ Directories created"
-  
-  # Initialize BIDS files
-  echo "Creating BIDS metadata files..."
-  initialize_readme
-  echo "  ✓ README created"
-  
-  initialize_dataset_description
-  echo "  ✓ Root dataset_description.json created"
-  
-  initialize_derivative_dataset_description "tit"
-  echo "  ✓ tit dataset_description.json created"
-  
-  initialize_derivative_dataset_description "freesurfer"
-  echo "  ✓ freesurfer dataset_description.json created"
-  
-  initialize_derivative_dataset_description "SimNIBS"
-  echo "  ✓ SimNIBS dataset_description.json created"
-  
-  # Initialize project status
-  echo "Creating project configuration..."
-  initialize_project_status
-  echo "  ✓ Project status file created"
-  
-  # Create a marker file to indicate initialization was done
-  touch "$LOCAL_PROJECT_DIR/code/ti-toolbox/config/.initialized"
-  echo "  ✓ Initialization marker created"
-  
-  echo ""
-  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  echo "  ✓ Project initialization complete!"
-  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  echo ""
-  
-  # Mark that example data needs to be copied after container starts
-  export NEEDS_EXAMPLE_DATA="true"
+ensure_images_pulled() {
+  local images
+  images=$(grep -E '^\s*image:' "$SCRIPT_DIR/docker-compose.yml" | awk '{print $2}')
+  [[ -n "$images" ]] || return 0
+  local missing=()
+  while IFS= read -r image; do
+    [[ -n "$image" ]] || continue
+    if ! docker images --format "{{.Repository}}:{{.Tag}}" | grep -q "^${image}$"; then
+      missing+=("$image")
+    fi
+  done <<< "$images"
+
+  if [[ ${#missing[@]} -gt 0 ]]; then
+    echo "Pulling required Docker images..."
+    docker compose -f "$SCRIPT_DIR/docker-compose.yml" pull
+  fi
 }
 
-# Main Script Execution
-validate_docker_compose
+initialize_project_in_container() {
+  local container_name="$SIMNIBS_CONTAINER_NAME"
+  local container_project_dir="/mnt/$PROJECT_DIR_NAME"
+
+  echo "Initializing project (inside container)..."
+
+  if ! docker exec "$container_name" test -d "$container_project_dir"; then
+    echo "  ⚠ Project directory not found in container: $container_project_dir"
+    return 1
+  fi
+
+  # Optionally keep the container-side example data manager in sync with this repo version.
+  # This does NOT use host Python; it only copies a file into the running container.
+  if [[ -f "$SCRIPT_DIR/tit/project_init/example_data_manager.py" ]]; then
+    docker cp "$SCRIPT_DIR/tit/project_init/example_data_manager.py" \
+      "$container_name:/ti-toolbox/tit/project_init/example_data_manager.py" >/dev/null 2>&1 || true
+  fi
+
+  # Run project init + optional example-data setup entirely in container python.
+  # Implemented with a container-side heredoc to avoid host-shell quoting issues.
+  docker exec \
+    -e PROJECT_DIR="$container_project_dir" \
+    "$container_name" \
+    bash -lc "cat <<'PY' | PYTHONPATH=/ti-toolbox simnibs_python -
+import os
+from pathlib import Path
+
+def main() -> int:
+    try:
+        from tit.project_init import is_new_project, initialize_project_structure, setup_example_data
+    except Exception as exc:
+        print(f\"  ⚠ Could not import tit.project_init in container: {exc}\")
+        return 0
+
+    project_dir = Path(os.environ['PROJECT_DIR'])
+    toolbox_root = Path('/ti-toolbox')
+
+    try:
+        if is_new_project(project_dir):
+            initialize_project_structure(project_dir)
+
+        # Returns False when it is a no-op; that's not an error.
+        setup_example_data(toolbox_root, project_dir)
+    except Exception as exc:
+        print(f\"  ⚠ Project initialization failed: {exc}\")
+
+    return 0
+
+raise SystemExit(main())
+PY"
+}
+
+run_docker_compose() {
+  ensure_docker_volumes
+  ensure_images_pulled
+
+  export TZ="$(get_host_timezone)"
+  export HOME=${HOME:-$USERPROFILE}
+
+  echo "Starting services..."
+  docker compose -f "$SCRIPT_DIR/docker-compose.yml" up --build -d
+
+  echo "Waiting for services to initialize..."
+  sleep 3
+
+  if ! docker ps --format "{{.Names}}" | grep -q "$SIMNIBS_CONTAINER_NAME"; then
+    echo "Error: simnibs service is not running. Please check your docker-compose.yml and container logs."
+    docker compose -f "$SCRIPT_DIR/docker-compose.yml" logs
+    exit 1
+  fi
+
+  initialize_project_in_container || true
+
+  echo "Attaching to the simnibs_container..."
+  if [[ -t 0 ]]; then
+    docker exec -ti "$SIMNIBS_CONTAINER_NAME" bash
+  else
+    docker exec -i "$SIMNIBS_CONTAINER_NAME" bash
+  fi
+
+  docker compose -f "$SCRIPT_DIR/docker-compose.yml" down
+}
+
+parse_args() {
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --project-dir)
+        PROJECT_DIR_ARG="$2"
+        shift 2
+        ;;
+      --yes)
+        AUTO_CREATE="true"
+        shift
+        ;;
+      --verbose)
+        # kept for backwards compatibility; currently a no-op
+        shift
+        ;;
+      *)
+        shift
+        ;;
+    esac
+  done
+}
+
+parse_args "$@"
+
+[[ -f "$SCRIPT_DIR/docker-compose.yml" ]] || die "Error: docker-compose.yml not found in $SCRIPT_DIR."
+
+check_docker_available
 display_welcome
-
-# Check macOS and XQuartz if on macOS
-if [[ "$OS_TYPE" == "Darwin" ]]; then
-    check_xquartz_version >/dev/null 2>&1
-    allow_network_clients >/dev/null 2>&1
-fi
-
-# Check Windows X server
-if [[ "$OS_TYPE" =~ ^(MINGW|MSYS|CYGWIN) ]]; then
-    echo "Windows detected. Please ensure your X server (VcXsrv/Xming) is running with:"
-    echo "  - 'Multiple windows' mode"
-    echo "  - 'Disable access control' checked"
-    echo "  - Firewall configured to allow X server connections"
-    echo ""
-    read -p "Press Enter to continue once X server is configured..."
-fi
 
 load_default_paths
 get_project_directory
 
-# Sanitize potential carriage returns from path
-LOCAL_PROJECT_DIR=${LOCAL_PROJECT_DIR%$'\r'}
-
-# Set up Docker Compose environment variables
-case "$OS_TYPE" in
-  MINGW*|MSYS*|CYGWIN*)
-    # Convert Windows paths to Docker-compatible format
-    if [[ "$LOCAL_PROJECT_DIR" =~ ^[A-Za-z]: ]]; then
-      DOCKER_PROJECT_DIR="/$(echo "$LOCAL_PROJECT_DIR" | sed 's/://' | sed 's/\\/\//g' | tr '[:upper:]' '[:lower:]')"
-    else
-      DOCKER_PROJECT_DIR="$LOCAL_PROJECT_DIR"
-    fi
-    export LOCAL_PROJECT_DIR="$DOCKER_PROJECT_DIR"
-    ;;
-  *)
-    export LOCAL_PROJECT_DIR
-    ;;
-esac
-
-# Compute and sanitize project dir name
 PROJECT_DIR_NAME=$(basename "$LOCAL_PROJECT_DIR")
-PROJECT_DIR_NAME=$(printf "%s" "$PROJECT_DIR_NAME" | tr -d '\r')
-export PROJECT_DIR_NAME
-
-# Save the paths for next time
 save_default_paths
 
-# Check and initialize project if new
-if check_if_new_project; then
-  initialize_project_structure
-fi
+maybe_init_macos_x11
+check_x_forwarding
 
-set_display_env >/dev/null 2>&1
-allow_xhost >/dev/null 2>&1
+export LOCAL_PROJECT_DIR
+export PROJECT_DIR_NAME
+export MPLBACKEND="$MPLBACKEND_VALUE"
 
-run_docker_compose 
+run_docker_compose

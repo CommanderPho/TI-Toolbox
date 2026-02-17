@@ -6,11 +6,24 @@
 echo "🚀 Starting Temporal Interference Toolbox Documentation Server..."
 echo ""
 
+# Use Homebrew Ruby 3.3 (installed for compatibility with macOS 15)
+export PATH="/opt/homebrew/opt/ruby@3.3/bin:$PATH"
+
 # Check if Ruby is installed
 if ! command -v ruby &> /dev/null; then
-    echo "❌ Ruby is not installed. Please install Ruby first."
-    echo "   Visit: https://www.ruby-lang.org/en/documentation/installation/"
+    echo "❌ Ruby is not installed. Please run: brew install ruby@3.3"
     exit 1
+fi
+
+echo "📍 Using Ruby: $(ruby --version)"
+echo "📍 Using Ruby path: $(which ruby)"
+
+# Kill any existing Jekyll processes to avoid port conflicts
+echo "🔧 Checking for existing Jekyll processes..."
+if pgrep -f "jekyll serve" > /dev/null; then
+    echo "🛑 Killing existing Jekyll processes..."
+    pkill -f "jekyll serve"
+    sleep 2
 fi
 
 # Check if Bundler is installed
@@ -34,7 +47,7 @@ echo "   Local URL: http://localhost:4000/TI-Toolbox/"
 echo "   Press Ctrl+C to stop"
 echo ""
 echo "💡 Tip: Google Analytics is enabled by default. To disable, run:"
-echo "   ENABLE_ANALYTICS=false bundle exec jekyll serve"
+echo "   ENABLE_ANALYTICS=false bash serve.sh"
 echo "   To enable live reload: bundle exec jekyll serve --livereload"
 echo ""
 
@@ -45,4 +58,4 @@ if [ "$ENABLE_ANALYTICS" = "false" ]; then
 else
   echo "📊 Google Analytics enabled (default)"
   bundle exec jekyll serve
-fi 
+fi

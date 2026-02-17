@@ -180,7 +180,9 @@ LOG_LEVEL_CRITICAL = "CRITICAL"
 # Log format
 LOG_FORMAT_STANDARD = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 LOG_FORMAT_SIMPLE = "%(levelname)s: %(message)s"
-LOG_FORMAT_DETAILED = "%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s"
+LOG_FORMAT_DETAILED = (
+    "%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s"
+)
 
 # ============================================================================
 # FILE PERMISSIONS
@@ -196,15 +198,15 @@ PERM_READ_ONLY = 0o444
 # ============================================================================
 
 # Color schemes
-COLOR_RED = '\033[0;31m'
-COLOR_GREEN = '\033[0;32m'
-COLOR_YELLOW = '\033[0;33m'
-COLOR_CYAN = '\033[0;36m'
-COLOR_BOLD = '\033[1m'
-COLOR_BOLD_CYAN = '\033[1;36m'
-COLOR_BOLD_YELLOW = '\033[1;33m'
-COLOR_UNDERLINE = '\033[4m'
-COLOR_RESET = '\033[0m'
+COLOR_RED = "\033[0;31m"
+COLOR_GREEN = "\033[0;32m"
+COLOR_YELLOW = "\033[0;33m"
+COLOR_CYAN = "\033[0;36m"
+COLOR_BOLD = "\033[1m"
+COLOR_BOLD_CYAN = "\033[1;36m"
+COLOR_BOLD_YELLOW = "\033[1;33m"
+COLOR_UNDERLINE = "\033[4m"
+COLOR_RESET = "\033[0m"
 
 # Plot parameters
 PLOT_DPI = 600
@@ -374,10 +376,7 @@ PATTERN_COORDINATE = r"^-?\d+\.?\d*$"
 # Default montage configuration
 DEFAULT_MONTAGE_CONFIG = {
     "nets": {
-        FILE_EGI_TEMPLATE: {
-            MONTAGE_TYPE_UNI_POLAR: {},
-            MONTAGE_TYPE_MULTI_POLAR: {}
-        }
+        FILE_EGI_TEMPLATE: {MONTAGE_TYPE_UNI_POLAR: {}, MONTAGE_TYPE_MULTI_POLAR: {}}
     }
 }
 
@@ -387,8 +386,57 @@ DEFAULT_ANALYZER_CONFIG = {
     "analysis_type": {"default": "spherical", "prompt": "enable"},
     "radius": {"default": DEFAULT_RADIUS_MM, "prompt": "enable"},
     "percentiles": {"default": DEFAULT_PERCENTILES, "prompt": "disable"},
-    "focality_cutoffs": {"default": DEFAULT_FOCALITY_CUTOFFS, "prompt": "disable"}
+    "focality_cutoffs": {"default": DEFAULT_FOCALITY_CUTOFFS, "prompt": "disable"},
 }
+
+# ============================================================================
+# QSI (QSIPrep/QSIRecon) INTEGRATION
+# ============================================================================
+
+# QSI Docker images
+QSI_QSIPREP_IMAGE = "pennlinc/qsiprep"
+QSI_QSIRECON_IMAGE = "pennlinc/qsirecon"
+QSI_DEFAULT_IMAGE_TAG = "1.1.1"
+
+# QSI directories
+DIR_QSIPREP = "qsiprep"
+DIR_QSIRECON = "qsirecon"
+DIR_DWI = "dwi"
+
+# QSI recon specs (available reconstruction pipelines)
+QSI_RECON_SPECS = [
+    "mrtrix_multishell_msmt_ACT-fast",
+    "multishell_scalarfest",
+    "dipy_dki",
+    "dipy_mapmri",
+    "amico_noddi",
+    "pyafq_tractometry",
+    "mrtrix_multishell_msmt_pyafq_tractometry",
+    "dsi_studio_gqi",
+    "dsi_studio_autotrack",
+]
+
+# QSI atlases (available for connectivity analysis)
+QSI_ATLASES = [
+    "AAL116",
+    "AICHA384Ext",
+    "Brainnetome246Ext",
+    "Gordon333Ext",
+    "MICCAI2012",
+    "Schaefer100",
+    "Schaefer200",
+    "Schaefer400",
+    "power264Ext",
+]
+
+# QSI default resource settings
+QSI_DEFAULT_CPUS = 8
+QSI_DEFAULT_MEMORY_GB = 32
+QSI_DEFAULT_OMP_THREADS = 1
+QSI_DEFAULT_OUTPUT_RESOLUTION = 2.0
+
+# QSI environment variable for local project directory
+ENV_LOCAL_PROJECT_DIR = "LOCAL_PROJECT_DIR"
 
 # ============================================================================
 # VERSION INFORMATION
@@ -397,4 +445,3 @@ DEFAULT_ANALYZER_CONFIG = {
 # This will be imported from version.py in the root
 # Kept here for reference
 VERSION_FILE = "version.py"
-

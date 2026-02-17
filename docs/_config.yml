@@ -37,4 +37,8 @@ exclude:
   - Gemfile.lock
   - README.md
   - vendor/
-  - .bundle/ 
+  - .bundle/
+  - build-docs.sh 
+  # MkDocs sources for API docs (the built site is committed to `docs/api/`)
+  - api_mkdocs/
+

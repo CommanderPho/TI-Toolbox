@@ -74,40 +74,53 @@ Mode that allows exploration of untraditional montages
 
 ## Available EEG Nets
 
-The simulator automatically detects and supports various electrode configurations:
+<img src="{{ site.baseurl }}/assets/imgs/simulator/eeg_nets_available.png" alt="Available EEG Nets" style="width: 100%; max-width: 800px;">
 
-### Standard EEG Nets
-- **10-10 System**: High-density electrode placement (64+ electrodes)
-- **10-20 System**: Standard clinical electrode placement (32 electrodes)
-- **GSN-HydroCel-256**: High-density research net (256 electrodes)
-- **GSN-HydroCel-185**: Research-grade net (185 electrodes)
+The TI-Toolbox automatically co-registers the following EEG electrode nets to head models during preprocessing. These pre-aligned nets enable seamless integration with simulation workflows, electrode optimization, and leadfield calculations.
 
-### Specialized Nets
-- **EGI Systems**: Multiple EGI electrode configurations
-- **EasyCap**: TMS-compatible electrode layouts
-- **Custom Nets**: User-defined electrode positions via CSV files
+### Automatic Co-registration Benefits
 
-### Net Detection
-- **Automatic Scanning**: Searches `eeg_positions/` directories for available nets
-- **Dynamic Updates**: Montage lists refresh based on selected EEG net
-- **Compatibility Filtering**: Only compatible montages shown for selected net
+- **Seamless Integration**: no manual registration steps
+- **Simulation Ready**: Instant compatibility with TI field simulation workflows
+- **Optimization Support**: Direct integration with flex-search tools
+- **Leadfield Generation**: all avilable for leadfield matrix creation
+
+### Net Detection and Management
+- **Automatic Scanning**: Searches `eeg_positions/` directories for available electrode configurations
+- **Dynamic Updates**: Montage lists automatically refresh based on selected EEG net
+- **Compatibility Filtering**: Only compatible montages are displayed for the selected electrode configuration
 
 ---
-
 ## Anisotropy
 
-The simulator supports different tissue conductivity models:
+The simulator supports different tissue conductivity models for more accurate field calculations.
 
 ### Isotropic Model
 - **Description**: Uniform conductivity in all directions
 - **Applications**: Simplified modeling, faster computation
 - **Limitations**: May not accurately represent white matter anisotropy
+- **Default**: Used when no DTI data is available
 
 ### Anisotropic Model
 - **Description**: Direction-dependent conductivity based on DTI data
-- **Requirements**: Diffusion tensor imaging (DTI) scans
+- **Requirements**: Diffusion tensor imaging (DTI) data processed through QSIPrep/QSIRecon
 - **Applications**: More realistic modeling of white matter tracts
 - **Processing**: Accounts for fiber orientation in field calculations
+
+### DTI Data Preparation
+
+The TI-Toolbox provides integrated DTI processing via QSIPrep and QSIRecon. The pipeline extracts diffusion tensors and converts them to the format required by SimNIBS.
+
+#### Required Files
+
+For anisotropic simulation, the following file must exist in the m2m directory:
+
+```
+derivatives/SimNIBS/sub-{id}/m2m_{id}/
+└── DTI_coregT1_tensor.nii.gz    # 4D tensor (X, Y, Z, 6)
+```
+
+For complete DTI processing instructions, see the [Diffusion Processing](diffusion-processing.md) documentation.
 
 #### DTI Eigen Vectors Visualization
 
@@ -118,7 +131,18 @@ The simulator supports different tissue conductivity models:
 
 These visualizations display the principal diffusion directions (eigen vectors) derived from diffusion tensor imaging (DTI) data, which are used to create direction-dependent conductivity tensors in anisotropic tissue modeling.
 
-For a complete explanation of DTI processing and tensor preparation, see the [SimNIBS wiki](https://simnibs.github.io/simnibs/build/html/documentation/command_line/dwi2cond.html).
+### Anisotropy Types
+
+SimNIBS supports different methods for applying anisotropic conductivity:
+
+| Type | Code | Description |
+|------|------|-------------|
+| **Scalar** | `'scalar'` | Isotropic (no DTI) |
+| **Direct** | `'dir'` | Direct mapping of tensor eigenvalues to conductivity |
+| **Volume Normalized** | `'vn'` | Normalized tensors scaled by tissue conductivity |
+
+
+For additional details on DTI processing theory, see the [SimNIBS dwi2cond documentation](https://simnibs.github.io/simnibs/build/html/documentation/command_line/dwi2cond.html).
 
 ---
 

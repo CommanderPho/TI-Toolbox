@@ -104,10 +104,13 @@ check_xquartz_version() {
 allow_network_clients() {
   defaults write org.macosforge.xquartz.X11 nolisten_tcp -bool false >/dev/null 2>&1
   
-  # Check if XQuartz is already running
-  if ! pgrep -x "Xquartz" > /dev/null; then
-    open -a XQuartz
-    sleep 2
+  if ! pgrep -x "XQuartz" >/dev/null 2>&1 && ! pgrep -x "Xquartz" >/dev/null 2>&1; then
+    echo ""
+    echo "========================================"
+    echo "WARNING: XQuartz is NOT running."
+    echo "Start XQuartz if you need GUI support."
+    echo "========================================"
+    echo ""
   fi
 }
 
@@ -252,7 +255,7 @@ get_version() {
 initialize_dataset_description() {
   local dataset_file="$LOCAL_PROJECT_DIR/dataset_description.json"
   local assets_template="$SCRIPT_DIR/../../resources/dataset_descriptions/root.dataset_description.json"
-  local fallback_template="$SCRIPT_DIR/../../new_project/dataset_description.json"
+  local fallback_template="$SCRIPT_DIR/../../tit/project_init/dataset_description.json"
 
   # If it already exists, skip
   if [ -f "$dataset_file" ]; then
@@ -268,13 +271,13 @@ initialize_dataset_description() {
   # Determine project name
   local project_name="${PROJECT_DIR_NAME:-$(basename "$LOCAL_PROJECT_DIR")}"
 
-  # Prefer assets template; fallback to new_project template
+  # Prefer assets template; fallback to project_init template
   if [ -f "$assets_template" ]; then
     cp "$assets_template" "$dataset_file" || { echo "Error: Failed to copy assets template"; return 1; }
   elif [ -f "$fallback_template" ]; then
     cp "$fallback_template" "$dataset_file" || { echo "Error: Failed to copy fallback template"; return 1; }
   else
-    echo "Error: No dataset_description template found in assets or new_project"; return 1
+    echo "Error: No dataset_description template found in assets or project_init"; return 1
   fi
   
   # Fill in the Name field
@@ -476,8 +479,8 @@ write_project_status() {
   echo ""
   echo "Initializing project status..."
 
-  # Set info directory to derivatives location
-  INFO_DIR="$LOCAL_PROJECT_DIR/derivatives/ti-toolbox/.ti-toolbox-info"
+  # Set status directory to config location
+  INFO_DIR="$LOCAL_PROJECT_DIR/code/ti-toolbox/config"
   STATUS_FILE="$INFO_DIR/project_status.json"
 
   mkdir -p "$INFO_DIR"
@@ -513,7 +516,7 @@ EOF
     fi
   fi
 
-  # No need to mirror since we're now using the derivatives location directly
+  # No need to mirror since we're now using the config location directly
   echo "✓ Project status updated"
   return 0
 }
@@ -523,12 +526,12 @@ setup_example_data_if_new() {
   echo "Setting up example data for new project..."
 
   local toolbox_root="$SCRIPT_DIR/../.."
-  local example_data_manager="$toolbox_root/tit/new_project/example_data_manager.py"
+  local example_data_manager="$toolbox_root/tit/project_init/example_data_manager.py"
   
   # Check if the example data manager exists
   if [ ! -f "$example_data_manager" ]; then
     echo "ERROR: Example data manager not found at $example_data_manager"
-    ls -la "$toolbox_root/tit/new_project/" 2>&1 || echo "Directory does not exist"
+    ls -la "$toolbox_root/tit/project_init/" 2>&1 || echo "Directory does not exist"
     return 1
   fi
   
@@ -554,7 +557,6 @@ initialize_project_configs() {
 
   local project_ti_toolbox_dir="$LOCAL_PROJECT_DIR/code/ti-toolbox"
   local project_config_dir="$project_ti_toolbox_dir/config"
-  local new_project_configs_dir="$SCRIPT_DIR/../../tit/new_project/configs"
   local is_new_project=false
   
   # Check if project directories exist
@@ -576,58 +578,17 @@ initialize_project_configs() {
     is_new_project=true
   fi
 
-  # If it's a new project, copy config files
+  # If it's a new project, initialize project metadata and files
   if [ "$is_new_project" = true ]; then
-    echo "Initializing new project with default configs..."
-
-    # Ensure source directory exists
-    if [ ! -d "$new_project_configs_dir" ]; then
-      echo "ERROR: Default configs directory not found at $new_project_configs_dir"
-      ls -la "$(dirname "$new_project_configs_dir")" 2>&1 || echo "Parent directory does not exist"
-      return 1
-    fi
+    echo "Initializing new project..."
     
-    # Create .ti-toolbox-info directory with error checking (under derivatives/ti-toolbox)
-    local info_dir="$LOCAL_PROJECT_DIR/derivatives/ti-toolbox/.ti-toolbox-info"
+    # Create config directory with error checking
+    local info_dir="$LOCAL_PROJECT_DIR/code/ti-toolbox/config"
     if ! mkdir -p "$info_dir" 2>/dev/null; then
       echo "ERROR: Could not create directory $info_dir"
       return 1
     fi
     
-    # Copy each config file individually and verify, but only if it doesn't exist
-    # Exclude entrypoint.json as it's not needed in project configs
-    for config_file in "$new_project_configs_dir"/*.json; do
-      if [ -f "$config_file" ]; then
-        filename=$(basename "$config_file")
-        
-        # Skip entrypoint.json
-        if [ "$filename" = "entrypoint.json" ]; then
-          continue
-        fi
-        
-        target_file="$project_config_dir/$filename"
-        
-        # Only copy if the file doesn't exist
-        if [ ! -f "$target_file" ]; then
-          if cp "$config_file" "$target_file" 2>/dev/null; then
-            echo "Copied $filename to $project_config_dir"
-            # Set proper permissions for the config file
-            chmod 644 "$target_file" 2>/dev/null || echo "Warning: Could not set permissions for $target_file"
-          else
-            echo "Error: Failed to copy $filename"
-            return 1
-          fi
-        else
-          echo "Config file $filename already exists, skipping..."
-        fi
-      fi
-    done
-    
-    # Set proper permissions for config directory
-    if ! chmod -R 755 "$project_config_dir" 2>/dev/null; then
-      echo "Warning: Could not set permissions for $project_config_dir"
-    fi
-
     # Create initial project status file
     local status_file="$info_dir/project_status.json"
     if ! cat > "$status_file" << EOF 2>/dev/null; then

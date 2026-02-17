@@ -1,3 +1,10 @@
+# Sphinx build outputs (auto-generated)
+# Keep _build/html/ for GitHub Pages, ignore everything else
+api/_build/*
+!api/_build/html/
+api/_static/
+api/_templates/
+
 # Jekyll
 _site/
 .sass-cache/
@@ -8,6 +15,11 @@ _site/
 vendor/
 .bundle/
 Gemfile.lock
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
 
 # macOS
 .DS_Store

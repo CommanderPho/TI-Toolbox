@@ -27,12 +27,54 @@ Simply download, install, and launch — the app handles Docker management for y
 
 <br>
 
+## Option 3: HPC (Apptainer/Singularity)
+
+For high-performance computing clusters where Docker is unavailable. Users build the `.sif` image from the definition file.
+
+**[Full HPC Deployment Guide]({{ site.baseurl }}/installation/hpc-apptainer/)**
+
+Quick start:
+```bash
+# 1. Get the definition file
+curl -O https://raw.githubusercontent.com/idossha/TI-toolbox/main/container/blueprint/apptainer.def
+curl -O https://raw.githubusercontent.com/idossha/TI-toolbox/main/container/blueprint/apptainer_run.sh
+chmod +x apptainer_run.sh
+
+# 2. Build the SIF (30-60 min, requires fakeroot or root)
+apptainer build ti-toolbox.sif apptainer.def
+
+# 3. Run interactively
+./apptainer_run.sh --sif ti-toolbox.sif --project-dir /data/my_study
+```
+
+<br>
+
 ---
 
-## Prerequisites (Required for Both Options)
+## Supported Operating Systems
 
+| Operating System | Support Level | Testing Status | Notes |
+|------------------|---------------|----------------|--------|
+| **Windows** | ✅ Full Support | ✅ Active Testing | Via WSL2 + Ubuntu |
+| **Linux (Ubuntu)** | ✅ Full Support | ✅ Active Testing | Primary development platform |
+| **macOS (Apple Silicon)** | ✅ Full Support | ✅ Active Testing | Native ARM64 support |
+| **macOS (Intel)** | ✅ Full Support | ⚠️ Stopped Testing | May work but no longer tested |
+
+### Known Issues
+- **Latest macOS version 26 (Tahoe)**: Potential compatibility issues with some graphical components
+
+
+---
+
+## Prerequisites
+
+**Options 1 & 2 (Desktop / CLI):**
 - **Docker**: [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Windows/macOS) or [Docker Engine](https://docs.docker.com/engine/install/) (Linux)
 - **X Server**: XQuartz (macOS), VcXsrv (Windows), or X11 (Linux - usually pre-installed)
+
+**Option 3 (HPC):**
+- **Apptainer** 1.1+ (or Singularity 3.8+) — typically provided by your cluster's module system
+- **FreeSurfer License**: Free from [FreeSurfer registration](https://surfer.nmr.mgh.harvard.edu/registration.html)
 
 ---
 <br>

@@ -438,15 +438,6 @@ ipcMain.handle('create-new-project', async (_event, projectDir, includeExampleDa
       }
     }
     
-    // Copy configuration files
-    const configSrcDir = path.join(toolboxRoot, 'tit', 'new_project', 'configs');
-    const configDstDir = path.join(validatedDir, 'code', 'ti-toolbox', 'config');
-    
-    if (fs.existsSync(configSrcDir)) {
-      await fs.copy(configSrcDir, configDstDir, { overwrite: false });
-      logger.info('Copied configuration files to new project');
-    }
-    
     // Create dataset_description.json if it doesn't exist
     const datasetDescPath = path.join(validatedDir, 'dataset_description.json');
     if (!fs.existsSync(datasetDescPath)) {
@@ -510,7 +501,7 @@ This dataset follows the Brain Imaging Data Structure (BIDS) specification for o
     }
     
     // Create project status file
-    const statusDir = path.join(validatedDir, 'derivatives', 'ti-toolbox', '.ti-toolbox-info');
+    const statusDir = path.join(validatedDir, 'code', 'ti-toolbox', 'config');
     const statusFile = path.join(statusDir, 'project_status.json');
     
     if (!fs.existsSync(statusFile)) {
@@ -525,7 +516,7 @@ This dataset follows the Brain Imaging Data Structure (BIDS) specification for o
         project_metadata: {
           name: path.basename(validatedDir),
           path: validatedDir,
-          version: '2.2.3'
+          version: '2.2.4'
         }
       };
       
