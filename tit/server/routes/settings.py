@@ -33,6 +33,7 @@ _SETTINGS_FILENAME = "settings.json"
 _DEFAULTS: dict[str, Any] = {
     "panels": [],
     "theme": "system",
+    "command_history_logging": False,
 }
 
 _VALID_THEMES: frozenset[str] = frozenset({"system", "light", "dark"})
@@ -107,11 +108,23 @@ class Settings(BaseModel):
             "means it must propose them (/api/proposals)"
         ),
     )
+    command_history_logging: bool = Field(
+        default=False,
+        description=(
+            "when enabled, each admitted job appends its argv to command_history.log in the "
+            "project directory"
+        ),
+    )
 
 
 def agent_auto_submit() -> bool:
     """Project setting: may an agent submit jobs directly? Off (the default) means it proposes."""
     return _load_project_settings().get("agent_auto_submit") is True
+
+
+def command_history_logging() -> bool:
+    """Project setting: append each job's argv to ``command_history.log`` when admitted."""
+    return _load_project_settings().get("command_history_logging") is True
 
 
 def _read_settings() -> dict[str, Any]:
@@ -128,6 +141,7 @@ def _read_settings() -> dict[str, Any]:
         "panels": [p for p in project.get("panels", []) if p in _VALID_PANELS],
         "theme": project.get("theme", "system"),
         "agent_auto_submit": project.get("agent_auto_submit") is True,
+        "command_history_logging": project.get("command_history_logging") is True,
     }
 
 
@@ -183,6 +197,7 @@ def put_settings(body: dict[str, Any]) -> Settings:
         "theme": _validate_theme(body.get("theme", "system")),
         # Absent (an older client) is off: the safe direction for a permission.
         "agent_auto_submit": body.get("agent_auto_submit") is True,
+        "command_history_logging": body.get("command_history_logging") is True,
     }
     if "enabled" in telemetry_body:
         # tit.telemetry.set_enabled also marks consent_shown=True, invalidates

@@ -1866,7 +1866,7 @@ export interface paths {
         };
         /**
          * Every project Overview fact in one bounded request
-         * @description The Overview page's single read (docs/dev/DECISIONS.md § 2026-09-05 (Overview, batch execution and explicit viewing) R1). One response carries every subject's presence columns, EEG nets/leadfields, output counts and workflow readiness, so the page's request count does not grow with the number of subjects, simulations or outputs. Detailed output discovery stays lazy and stays in Results.
+         * @description The Overview page's single read (docs/dev/DECISIONS.md Â§ 2026-09-05 (Overview, batch execution and explicit viewing) R1). One response carries every subject's presence columns, EEG nets/leadfields, output counts and workflow readiness, so the page's request count does not grow with the number of subjects, simulations or outputs. Detailed output discovery stays lazy and stays in Results.
          */
         get: {
             parameters: {
@@ -2024,7 +2024,7 @@ export interface paths {
                     };
                 };
                 401: components["responses"]["Unauthorized"];
-                /** @description a config that does not deserialize for the kind, or an output folder outside the project (an absolute `output_folder`/`output_dir` elsewhere, or a name that climbs out): "Outputs must stay inside the project folder …" */
+                /** @description a config that does not deserialize for the kind, or an output folder outside the project (an absolute `output_folder`/`output_dir` elsewhere, or a name that climbs out): "Outputs must stay inside the project folder â€¦" */
                 422: {
                     headers: {
                         [name: string]: unknown;
@@ -2366,7 +2366,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * The job's output folder as it is on disk — every file, with sizes
+         * The job's output folder as it is on disk â€” every file, with sizes
          * @description The Artifacts tab's one source. `folder` is the directory the job's registered artifacts point at (a `dir` artifact first, else the directory of its first file artifact); `files` is read from the filesystem at request time (bounded walk, three levels, jailed to the project), so a run's outputs are listed whether or not the runner registered each one. `folder` is null and `files` empty for a job that registered nothing (failed before writing, or `project_init`).
          */
         get: {
@@ -3049,7 +3049,7 @@ export interface paths {
         put?: never;
         /**
          * Write the scene file the host-installed Tetravox desktop app opens
-         * @description V2 (docs/dev/DECISIONS.md § 2026-09-06 (Native panes, job rows and notebooks)). Builds exactly the ViewSpec GET /api/view/{kind} would build for the same selection, rewrites every dataset and sidecar path from an /api/files/raw URL to the host's own absolute path, and writes it to <project>/code/ti-toolbox/viewer/<name>.tetravox.json -- the compound extension the Tetravox app registers as its scene type. This launches nothing: the server has no display, and the app it is written for runs on the host. One file per selection kind, overwritten on every Open, so the directory does not grow without bound.
+         * @description V2 (docs/dev/DECISIONS.md Â§ 2026-09-06 (Native panes, job rows and notebooks)). Builds exactly the ViewSpec GET /api/view/{kind} would build for the same selection, rewrites every dataset and sidecar path from an /api/files/raw URL to the host's own absolute path, and writes it to <project>/code/ti-toolbox/viewer/<name>.tetravox.json -- the compound extension the Tetravox app registers as its scene type. This launches nothing: the server has no display, and the app it is written for runs on the host. One file per selection kind, overwritten on every Open, so the directory does not grow without bound.
          */
         post: {
             parameters: {
@@ -3120,7 +3120,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Every file this subject/simulation offers the Viewer's "+ Add…"
+         * Every file this subject/simulation offers the Viewer's "+ Addâ€¦"
          * @description VM2. Only files a scene can use (volumes and meshes), grouped the way a person looks for one, each with its size -- one of them is routinely 64 MB, and the point of the picker is to choose without guessing. A read: it opens nothing and writes nothing.
          */
         get: {
@@ -4177,7 +4177,7 @@ export interface paths {
         };
         /**
          * Everything one subject's scene pane can load, with cache state
-         * @description `202` with a `Retry-After` header while the surfaces are still being extracted from the head mesh; the body then carries `cache.state: "building"`, an empty `parts`, and the cheap halves (`nets`, `atlases`, `volumes`) already filled in. `wait=<seconds>` asks for an explicit, capped block instead of polling — the default of 0 never holds the connection. `X-Scene-Build-Ms` reports what the served artifacts cost to build and `X-Scene-Cache: hit|building` whether this request paid it.
+         * @description `202` with a `Retry-After` header while the surfaces are still being extracted from the head mesh; the body then carries `cache.state: "building"`, an empty `parts`, and the cheap halves (`nets`, `atlases`, `volumes`) already filled in. `wait=<seconds>` asks for an explicit, capped block instead of polling â€” the default of 0 never holds the connection. `X-Scene-Build-Ms` reports what the served artifacts cost to build and `X-Scene-Cache: hit|building` whether this request paid it.
          */
         get: {
             parameters: {
@@ -4203,7 +4203,7 @@ export interface paths {
                             space: "subject-ras";
                             /** @description [x0, y0, z0, x1, y1, z1] over every served part, world mm; `null` when no part is cached yet, which is the body a `202` carries. */
                             bbox?: number[] | null;
-                            /** @description The framing hint (plan §S7): the same box with the neck cut off at the lowest grey-matter vertex, i.e. everything at or above the bottom of the cerebellum. `bbox` is what the scene *contains*; this is what a pane should *frame*, because a head model's skin runs to the shoulders (sub-ernie: z = -128.9 mm, against -50.7 for grey matter) and framing that spends about a fifth of a pane's height on neck. `null` on a `202`, and on any cache entry written before builder version 2. */
+                            /** @description The framing hint (plan Â§S7): the same box with the neck cut off at the lowest grey-matter vertex, i.e. everything at or above the bottom of the cerebellum. `bbox` is what the scene *contains*; this is what a pane should *frame*, because a head model's skin runs to the shoulders (sub-ernie: z = -128.9 mm, against -50.7 for grey matter) and framing that spends about a fifth of a pane's height on neck. `null` on a `202`, and on any cache entry written before builder version 2. */
                             focus_bbox?: number[] | null;
                             parts: {
                                 /** @enum {string} */
@@ -4216,7 +4216,7 @@ export interface paths {
                                 fingerprint: string;
                                 url: string;
                                 simplified?: boolean;
-                                /** @description false when the §S3 budget (150 000 triangles, 3 MB) could not be met; the true counts are still reported rather than the payload silently shipping oversized. */
+                                /** @description false when the Â§S3 budget (150 000 triangles, 3 MB) could not be met; the true counts are still reported rather than the payload silently shipping oversized. */
                                 within_budget?: boolean;
                                 max_deviation_mm?: number;
                                 bbox?: number[];
@@ -4280,14 +4280,14 @@ export interface paths {
         };
         /**
          * One scene surface (skin or gm) as TVSC1 or GIfTI binary
-         * @description The `tvsc` payload is the `TVSC1` layout frozen in `docs/dev/DECISIONS.md § 2026-09-04 (Scene service and retained pages)` §2.3: a 32-byte header (magic `TVSC`, version 1, `u32` vertexCount, `u32` indexCount, `u32` flags, 12 reserved bytes) then `float32` positions in world millimetres and `uint32` triangle indices. `format=gii` serves the same vertices and triangles as a GIfTI mesh for any GIfTI reader. `ETag` is the part plus its source fingerprint and the requested format, and the response is `must-revalidate`, because the same URL legitimately changes content after charm is re-run. `X-Scene-Vertices` / `X-Scene-Triangles` repeat the manifest's counts so a client can size a buffer before reading the body.
+         * @description The `tvsc` payload is the `TVSC1` layout frozen in `docs/dev/DECISIONS.md Â§ 2026-09-04 (Scene service and retained pages)` Â§2.3: a 32-byte header (magic `TVSC`, version 1, `u32` vertexCount, `u32` indexCount, `u32` flags, 12 reserved bytes) then `float32` positions in world millimetres and `uint32` triangle indices. `format=gii` serves the same vertices and triangles as a GIfTI mesh for any GIfTI reader. `ETag` is the part plus its source fingerprint and the requested format, and the response is `must-revalidate`, because the same URL legitimately changes content after charm is re-run. `X-Scene-Vertices` / `X-Scene-Triangles` repeat the manifest's counts so a client can size a buffer before reading the body.
          */
         get: {
             parameters: {
                 query: {
                     subject: string;
                     part: "skin" | "gm";
-                    /** @description Which serialisation to serve. `tvsc` is the frozen `TVSC1` binary above; `gii` is GIfTI — `NIFTI_INTENT_POINTSET` (float32) plus `NIFTI_INTENT_TRIANGLE` (int32), `GZipBase64Binary` (a zlib stream), the coordinate system declared as `NIFTI_XFORM_SCANNER_ANAT` with an identity matrix — which any GIfTI reader takes with no bespoke decoder (`docs/dev/DECISIONS.md § 2026-09-05/06 (Independent Tetravox delivery)` decision E7). Both are built from the same vertices and triangles by one build, and the `ETag` names the format so one payload can never be revalidated as the other. */
+                    /** @description Which serialisation to serve. `tvsc` is the frozen `TVSC1` binary above; `gii` is GIfTI â€” `NIFTI_INTENT_POINTSET` (float32) plus `NIFTI_INTENT_TRIANGLE` (int32), `GZipBase64Binary` (a zlib stream), the coordinate system declared as `NIFTI_XFORM_SCANNER_ANAT` with an identity matrix â€” which any GIfTI reader takes with no bespoke decoder (`docs/dev/DECISIONS.md Â§ 2026-09-05/06 (Independent Tetravox delivery)` decision E7). Both are built from the same vertices and triangles by one build, and the `ETag` names the format so one payload can never be revalidated as the other. */
                     format?: "tvsc" | "gii";
                     wait?: number;
                 };
@@ -4349,14 +4349,14 @@ export interface paths {
         };
         /**
          * Per-vertex uint16 region labels aligned to part "gm", as TVSC1 or GIfTI binary
-         * @description `format=tvsc` serves the compatibility labels payload (`indexCount` 0, `flags` bit0 set): the same positions the `gm` surface serves, in the same order, followed by one `uint16` per vertex. `format=gii` serves a renderable GIfTI mesh carrying the grey-matter triangles plus a `NIFTI_INTENT_LABEL` array and the atlas' `<LabelTable>`, so Tetravox can render and pick cortical regions from this one dataset. `0` means "no region" — the head mesh's grey-matter tag covers cerebellum and brainstem, which no cortical atlas describes. The label values index the `legend[].label` field of `GET /api/scene/regions` for the same atlas.
+         * @description `format=tvsc` serves the compatibility labels payload (`indexCount` 0, `flags` bit0 set): the same positions the `gm` surface serves, in the same order, followed by one `uint16` per vertex. `format=gii` serves a renderable GIfTI mesh carrying the grey-matter triangles plus a `NIFTI_INTENT_LABEL` array and the atlas' `<LabelTable>`, so Tetravox can render and pick cortical regions from this one dataset. `0` means "no region" â€” the head mesh's grey-matter tag covers cerebellum and brainstem, which no cortical atlas describes. The label values index the `legend[].label` field of `GET /api/scene/regions` for the same atlas.
          */
         get: {
             parameters: {
                 query: {
                     subject: string;
                     atlas: string;
-                    /** @description Which serialisation to serve. `tvsc` is the frozen `TVSC1` binary above; `gii` is GIfTI — `NIFTI_INTENT_POINTSET` (float32) plus `NIFTI_INTENT_TRIANGLE` (int32), `GZipBase64Binary` (a zlib stream), the coordinate system declared as `NIFTI_XFORM_SCANNER_ANAT` with an identity matrix — which any GIfTI reader takes with no bespoke decoder (`docs/dev/DECISIONS.md § 2026-09-05/06 (Independent Tetravox delivery)` decision E7). Both are built from the same vertices and triangles by one build, and the `ETag` names the format so one payload can never be revalidated as the other. */
+                    /** @description Which serialisation to serve. `tvsc` is the frozen `TVSC1` binary above; `gii` is GIfTI â€” `NIFTI_INTENT_POINTSET` (float32) plus `NIFTI_INTENT_TRIANGLE` (int32), `GZipBase64Binary` (a zlib stream), the coordinate system declared as `NIFTI_XFORM_SCANNER_ANAT` with an identity matrix â€” which any GIfTI reader takes with no bespoke decoder (`docs/dev/DECISIONS.md Â§ 2026-09-05/06 (Independent Tetravox delivery)` decision E7). Both are built from the same vertices and triangles by one build, and the `ETag` names the format so one payload can never be revalidated as the other. */
                     format?: "tvsc" | "gii";
                     wait?: number;
                 };
@@ -4418,7 +4418,7 @@ export interface paths {
         };
         /**
          * One atlas' legend plus the URL of its label payload for part "gm"
-         * @description `legend[].label` is the `uint16` value that appears in the payload at `url`; `legend[].id` is the region's `.annot` row index within its own hemisphere — the same integer `GET /api/catalog/atlases/regions` and `FlexConfig.AtlasROI.label` use, so a pick in the pane maps straight onto a config.
+         * @description `legend[].label` is the `uint16` value that appears in the payload at `url`; `legend[].id` is the region's `.annot` row index within its own hemisphere â€” the same integer `GET /api/catalog/atlases/regions` and `FlexConfig.AtlasROI.label` use, so a pick in the pane maps straight onto a config.
          */
         get: {
             parameters: {
@@ -4813,7 +4813,7 @@ export interface paths {
                              * @enum {string}
                              */
                             guide_id?: "default" | "mni";
-                            /** @description every packaged guide this installation actually has, in catalogue order — the pane's Subject | MNI switch offers only what is listed here */
+                            /** @description every packaged guide this installation actually has, in catalogue order â€” the pane's Subject | MNI switch offers only what is listed here */
                             guides?: {
                                 /** @enum {string} */
                                 id: "default" | "mni";
@@ -4827,7 +4827,7 @@ export interface paths {
                             bbox?: number[] | null;
                             focus_bbox?: number[] | null;
                             parts: {
-                                /** @description `skin`, `gm`, `subcortical`, or `atlas-<file>` — the MNI guide packages one surface per atlas volume, and `atlases[].aligned_to` names which part carries a given atlas' labels. */
+                                /** @description `skin`, `gm`, `subcortical`, or `atlas-<file>` â€” the MNI guide packages one surface per atlas volume, and `atlases[].aligned_to` names which part carries a given atlas' labels. */
                                 id: string;
                                 /** @enum {string} */
                                 kind: "surface";
@@ -6131,7 +6131,7 @@ export interface components {
             montages: string[];
             /** @description The fields the simulation saved: those its field mesh (<TI|mTI>/mesh/<sim>_<TI|mTI>.msh) carries and those of its NIfTIs (with the carriers' magnE), sorted. NIfTIs are opt-in, so a default run lists its mesh fields (TI_max or mTI_max, hf_peak, hf_rms) with no NIfTI; an analysis of a field not listed computes it first. */
             fields: string[];
-            /** @description The run record says carrier-only control (ΔF = 0): it has no envelope, so TI_max, TI_avg and TI_normal are neither saved nor producible. Absent: false. */
+            /** @description The run record says carrier-only control (Î”F = 0): it has no envelope, so TI_max, TI_avg and TI_normal are neither saved nor producible. Absent: false. */
             carrier_only?: boolean;
             space: ("subject" | "mni")[];
             report_ids: string[];
@@ -6204,7 +6204,7 @@ export interface components {
                 };
             };
         };
-        /** @description One integer label present in a segmentation volume. `id` is the voxel value (what `SubcorticalConfig.labels` carries), `name` comes from a sidecar colour table or the bundled FreeSurfer LUT and falls back to `Label {id}`, and `n_voxels` is how many voxels carry it — the size cue that tells a stray label from a real structure. */
+        /** @description One integer label present in a segmentation volume. `id` is the voxel value (what `SubcorticalConfig.labels` carries), `name` comes from a sidecar colour table or the bundled FreeSurfer LUT and falls back to `Label {id}`, and `n_voxels` is how many voxels carry it â€” the size cue that tells a stray label from a real structure. */
         NiftiLabel: {
             id: number;
             name: string;
@@ -6535,6 +6535,10 @@ export interface components {
             created_by?: string | null;
             /** @description Container path to this job's raw stdout/stderr log (`code/ti-toolbox/jobs/<id>/stdout.log`), the same file `GET /api/jobs/{id}/log` serves. Present so `pages/jobs/JobDetailDrawer.tsx` can show/copy it without reconstructing the path convention client-side (ra_13 finding 6). */
             log_path?: string | null;
+            /** @description Argv the runner was spawned with (null until admit builds it, and on records written before this field existed). Used with `command` for the job detail Copy command action. */
+            argv?: string[] | null;
+            /** @description POSIX shell-escaped form of `argv`, ready to paste into bash; null when `argv` is null or empty. */
+            command?: string | null;
         };
         JobSpec: {
             kind: components["schemas"]["JobKind"];
@@ -6954,6 +6958,8 @@ export interface components {
             theme: "system" | "light" | "dark";
             /** @description "Agent may submit without approval" (Settings > Project > AI assistant). Off (the default, and what an absent field means on PUT) makes POST /api/jobs and /api/jobs/groups refuse created_by agent with 403; the agent proposes instead (/api/proposals). */
             agent_auto_submit?: boolean;
+            /** @description When enabled, each admitted job appends its argv to `command_history.log` in the project directory. Off by default; an absent field on PUT means off. */
+            command_history_logging?: boolean;
         };
         /**
          * SimulationConfig

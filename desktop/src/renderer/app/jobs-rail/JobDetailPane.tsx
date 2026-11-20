@@ -9,7 +9,7 @@
  */
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ExternalLink, Eye, FolderOpen, RotateCw, Square, Trash2, Zap } from "lucide-react";
+import { Copy, ExternalLink, Eye, FolderOpen, RotateCw, Square, Trash2, Zap } from "lucide-react";
 import { ApiError } from "../../api/client";
 import { Button, IconButton } from "../../ui/Button";
 import { Callout, DefinitionList, EmptyState, InlineError, Skeleton } from "../../ui/Feedback";
@@ -252,6 +252,22 @@ export function JobDetailPane({ job, onOpenJob, density = "page", headerControls
       </div>
 
       <div className="job-detail-actions">
+        {job.command && (
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<Copy size={14} />}
+            data-testid="job-detail-copy-command"
+            onClick={() => {
+              void navigator.clipboard.writeText(job.command!).then(
+                () => notify.success("Command copied."),
+                () => notify.error("Could not copy the command."),
+              );
+            }}
+          >
+            Copy command
+          </Button>
+        )}
         {canStop && (
           <Button variant="secondary" size="sm" icon={<Square size={14} />} onClick={() => setConfirm("stop")}>
             Stop

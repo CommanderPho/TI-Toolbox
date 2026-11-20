@@ -22,6 +22,8 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Literal, get_args
 
+from tit.jobs.command_history import format_command
+
 # All kinds the internal job model understands.
 JOB_KINDS: tuple[str, ...] = (
     "pre",
@@ -361,6 +363,9 @@ class JobStatus:
     #: Copied from :attr:`JobSpec.created_by` so a job row can say who queued it (the desktop
     #: badges ``"agent"``); ``None`` on a record written before the field existed.
     created_by: str | None = None
+    #: Argv the runner was (or will be) spawned with; ``None`` until admit builds it, and on
+    #: records written before this field existed. Exposed by :meth:`to_api` for Copy command.
+    argv: list[str] | None = None
     # Internal-only (persisted to status.json, stripped by to_api()):
     pid: int | None = None
     create_time: float | None = None
@@ -408,6 +413,8 @@ class JobStatus:
             "rss_avg": self.rss_avg,
             "created_by": self.created_by,
             "log_path": stdout_path(project_dir, self.id) if project_dir else None,
+            "argv": list(self.argv) if self.argv is not None else None,
+            "command": format_command(self.argv) if self.argv else None,
         }
 
     @classmethod
@@ -436,6 +443,11 @@ class JobStatus:
             rss_peak=data.get("rss_peak"),
             rss_avg=data.get("rss_avg"),
             created_by=data.get("created_by"),
+            argv=(
+                [str(a) for a in data["argv"]]
+                if isinstance(data.get("argv"), list)
+                else None
+            ),
             pid=data.get("pid"),
             create_time=data.get("create_time"),
             budget_wait=data.get("budget_wait"),

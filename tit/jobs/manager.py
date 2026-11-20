@@ -28,6 +28,7 @@ import psutil
 
 from tit.cpu import cpu_limit
 from tit.jobs import kinds, locks, scheduler
+from tit.jobs.command_history import append_command_history
 from tit.jobs.kinds import may_spawn_docker_siblings
 from tit.jobs.costs import default_cost
 from tit.jobs.registry import (
@@ -978,6 +979,11 @@ class JobManager:
                 )
             return
 
+        with self._lock:
+            status.argv = list(argv)
+            self._persist_status(status)
+        self._maybe_log_command_history(spec, argv)
+
         env = runner_env(
             spec.id,
             events_path(self.project_dir, spec.id),
@@ -1037,6 +1043,21 @@ class JobManager:
         self._publish_status(status)
         assert self._loop is not None
         self._loop.create_task(self._await_exit(spec.id, proc))
+
+    def _maybe_log_command_history(self, spec: JobSpec, argv: list[str]) -> None:
+        """Append the job's argv to ``command_history.log`` when the project setting is on."""
+        try:
+            from tit.server.routes.settings import command_history_logging
+        except Exception:
+            return
+        if not command_history_logging():
+            return
+        append_command_history(
+            self.project_dir,
+            job_id=spec.id,
+            kind=spec.kind,
+            argv=argv,
+        )
 
     async def _stop_spawned_after_cancel(
         self, job_id: str, proc: asyncio.subprocess.Process

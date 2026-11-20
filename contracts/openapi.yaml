@@ -5315,6 +5315,17 @@ components:
             Container path to this job's raw stdout/stderr log (`code/ti-toolbox/jobs/<id>/stdout.log`),
             the same file `GET /api/jobs/{id}/log` serves. Present so `pages/jobs/JobDetailDrawer.tsx`
             can show/copy it without reconstructing the path convention client-side (ra_13 finding 6).
+        argv:
+          type: [array, "null"]
+          items: { type: string }
+          description: >-
+            Argv the runner was spawned with (null until admit builds it, and on records written
+            before this field existed). Used with `command` for the job detail Copy command action.
+        command:
+          type: [string, "null"]
+          description: >-
+            POSIX shell-escaped form of `argv`, ready to paste into bash; null when `argv` is null
+            or empty.
     JobSpec:
       type: object
       required: [kind, config, subject_ids]
@@ -6033,6 +6044,11 @@ components:
             default, and what an absent field means on PUT) makes POST /api/jobs and
             /api/jobs/groups refuse created_by agent with 403; the agent proposes instead
             (/api/proposals).
+        command_history_logging:
+          type: boolean
+          description: >-
+            When enabled, each admitted job appends its argv to `command_history.log` in the
+            project directory. Off by default; an absent field on PUT means off.
 
     # --------------------------------------------------------------- config placeholders (F1b fills)
     SimulationConfig:

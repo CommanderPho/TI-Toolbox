@@ -95,6 +95,7 @@ def test_job_status_round_trip_and_api_strips_internals():
         cpu_percent_avg=140.5,
         rss_peak=4096,
         rss_avg=2048,
+        argv=["simnibs_python", "-m", "tit.opt.ex", "cfg.json"],
         pid=999,
         create_time=123.0,
         budget_wait="waiting for cpu",
@@ -111,6 +112,8 @@ def test_job_status_round_trip_and_api_strips_internals():
     # None with no project_dir (e.g. this bare-dataclass test), the registry's real stdout
     # path convention once one is supplied.
     assert api["log_path"] is None
+    assert api["argv"] == ["simnibs_python", "-m", "tit.opt.ex", "cfg.json"]
+    assert api["command"] == "simnibs_python -m tit.opt.ex cfg.json"
     # Peak/average survive both the persisted and the API shape (a finished job keeps them).
     assert (api["cpu_percent_peak"], api["cpu_percent_avg"]) == (310.0, 140.5)
     assert (api["rss_peak"], api["rss_avg"]) == (4096, 2048)

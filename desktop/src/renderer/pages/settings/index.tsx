@@ -291,6 +291,29 @@ function SettingsPage() {
           </CardBody>
         </Card>
 
+        <Card>
+          <CardHeader title="Command history" />
+          <CardBody>
+            {form && (
+              <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+                <Switch
+                  id="settings-command-history"
+                  checked={form.command_history_logging === true}
+                  onCheckedChange={(on) => patch({ command_history_logging: on })}
+                  aria-label="Enable command history logging"
+                />
+                <label htmlFor="settings-command-history" className="field-label" style={{ cursor: "pointer" }}>
+                  Enable command history logging
+                </label>
+              </div>
+            )}
+            <p className="field-help" style={{ marginTop: "var(--space-2)" }}>
+              When enabled, each job the toolbox starts is appended to <code>command_history.log</code> in the project
+              directory so you can replay runs from a shell. Job detail also offers Copy command for a single job.
+            </p>
+          </CardBody>
+        </Card>
+
         <NotificationsCard />
 
         <Card>
