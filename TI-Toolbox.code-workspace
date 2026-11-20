@@ -60,6 +60,70 @@
 			"activityBar.activeBorder": "#9725d0",
 			"activityBarBadge.foreground": "#ffffff",
 			"activityBarBadge.background": "#9725d0"
+		},
+		"actionButtons": {
+			"defaultColor": "#e0b0ff",
+			"reloadButton": "↻",
+			"loadNpmCommands": false,
+			"commands": [
+				{
+					"name": "Desktop Dev",
+					"tooltip": "Build Electron + open TI-Toolbox; choose a project in the app (Docker Desktop must be running)",
+					"color": "#53c763",
+					"useVsCodeApi": false,
+					"singleInstance": true,
+					"cwd": "${workspaceFolder}/desktop",
+					"command": "npm run dev"
+				},
+				{
+					"name": "Dev Web",
+					"tooltip": "Container + Vite HMR at http://127.0.0.1:5173/ (no Electron)",
+					"color": "#7FDBFF",
+					"useVsCodeApi": false,
+					"singleInstance": true,
+					"cwd": "${workspaceFolder}/desktop",
+					"command": "npm run dev:web"
+				},
+				{
+					"name": "Dev Down",
+					"tooltip": "Stop and remove this project's TI-Toolbox dev container",
+					"color": "#ff8a65",
+					"useVsCodeApi": false,
+					"cwd": "${workspaceFolder}/desktop",
+					"command": "npm run dev:down"
+				},
+				{
+					"name": "npm install",
+					"tooltip": "Install desktop Node deps (once / after package.json changes)",
+					"color": "#b388ff",
+					"useVsCodeApi": false,
+					"cwd": "${workspaceFolder}/desktop",
+					"command": "npm install"
+				},
+				{
+					"name": "Typecheck",
+					"tooltip": "desktop TypeScript check (tsc)",
+					"color": "#ce93d8",
+					"useVsCodeApi": false,
+					"cwd": "${workspaceFolder}/desktop",
+					"command": "npm run typecheck"
+				},
+				{
+					"name": "Unit tests",
+					"tooltip": "Host pytest for command-history / job status (uv)",
+					"color": "#80cbc4",
+					"useVsCodeApi": false,
+					"cwd": "${workspaceFolder}",
+					"command": "uv run --extra test pytest tests/test_command_history.py tests/test_jobs_model.py::test_job_status_round_trip_and_api_strips_internals -q"
+				}
+			]
 		}
+	},
+	"extensions": {
+		"recommendations": [
+			"jkearins.action-buttons-ext",
+			"mads-hartmann.bash-ide-vscode",
+			"timonwong.shellcheck"
+		]
 	}
 }
